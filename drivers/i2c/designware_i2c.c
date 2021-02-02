@@ -7,7 +7,9 @@
 
 #include <common.h>
 #include <asm/io.h>
+#if defined(CONFIG_SPEAR600) || defined(CONFIG_SPEAR3XX)
 #include <asm/arch/hardware.h>
+#endif
 #include "designware_i2c.h"
 
 #ifdef CONFIG_I2C_MULTI_BUS
@@ -126,7 +128,8 @@ void i2c_init(int speed, int slaveadd)
 	enbl &= ~IC_ENABLE_0B;
 	writel(enbl, &i2c_regs_p->ic_enable);
 
-	writel((IC_CON_SD | IC_CON_SPD_FS | IC_CON_MM), &i2c_regs_p->ic_con);
+	writel((IC_CON_SD | IC_CON_SPD_FS | IC_CON_MM | IC_CON_RE),
+	       &i2c_regs_p->ic_con);
 	writel(IC_RX_TL, &i2c_regs_p->ic_rx_tl);
 	writel(IC_TX_TL, &i2c_regs_p->ic_tx_tl);
 	i2c_set_bus_speed(speed);
@@ -193,12 +196,12 @@ static int check_params(uint addr, int alen, uchar *buffer, int len)
 		return 1;
 	}
 
-	if (alen > 1) {
+	if (alen > 4) {
 		printf("addr len %d not supported\n", alen);
 		return 1;
 	}
 
-	if (addr + len > 256) {
+	if (alen != 4 && addr + len > 1 << (alen * 8)) {
 		printf("address out of range\n");
 		return 1;
 	}
@@ -206,13 +209,17 @@ static int check_params(uint addr, int alen, uchar *buffer, int len)
 	return 0;
 }
 
-static int i2c_xfer_init(uchar chip, uint addr)
+static int i2c_xfer_init(uchar chip, uint addr, int alen)
 {
+	int i;
 	if (i2c_wait_for_bb())
 		return 1;
 
 	i2c_setaddress(chip);
-	writel(addr, &i2c_regs_p->ic_cmd_data);
+	/* assume alen is smaller then txfifo */
+	for (i = 0; i < alen; i++)
+		writel((addr >> ((alen - 1 - i) * 8)) & 0xff,
+		       &i2c_regs_p->ic_cmd_data);
 
 	return 0;
 }
@@ -260,7 +267,7 @@ int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
 	if (check_params(addr, alen, buffer, len))
 		return 1;
 
-	if (i2c_xfer_init(chip, addr))
+	if (i2c_xfer_init(chip, addr, alen))
 		return 1;
 
 	start_time_rx = get_timer(0);
@@ -301,7 +308,7 @@ int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
 	if (check_params(addr, alen, buffer, len))
 		return 1;
 
-	if (i2c_xfer_init(chip, addr))
+	if (i2c_xfer_init(chip, addr, alen))
 		return 1;
 
 	start_time_tx = get_timer(0);

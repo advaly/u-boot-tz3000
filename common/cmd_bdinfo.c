@@ -11,6 +11,10 @@
 #include <common.h>
 #include <command.h>
 #include <linux/compiler.h>
+#ifdef CONFIG_ARM
+#include <malloc.h>
+#include <asm/sections.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -358,12 +362,29 @@ int do_bdinfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	print_num("arch_number",	bd->bi_arch_number);
 	print_num("boot_params",	(ulong)bd->bi_boot_params);
+#ifdef CONFIG_TZ3000_EVA
+	printf("Peri Clock  = %d [Hz]\n", tz3000_periph_clk);
+#endif
+#ifdef CONFIG_TZ2000_EVA
+	printf("Peri Clock  = %d [Hz]\n", tz2000_periph_clk);
+	printf("Board ID    = %d\n", tz2000_board_id);
+	printf("Debug Board = %d\n", tz2000_debug_board);
+	printf("USB Host/device = %d\n", tz2000_usb_hd);
+#endif
 
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; ++i) {
 		print_num("DRAM bank",	i);
 		print_num("-> start",	bd->bi_dram[i].start);
 		print_num("-> size",	bd->bi_dram[i].size);
 	}
+#ifndef CONFIG_SYS_NO_FLASH
+	/* Flash configuration */
+	for (i = 0; i < CONFIG_SYS_MAX_FLASH_BANKS; ++i) {
+		printf("FLASH bank # %d:\n", i + 1);
+		print_num("-> start",	flash_info[i].start[0]);
+		print_num("-> size",	flash_info[i].size);
+	}
+#endif
 
 #if defined(CONFIG_CMD_NET)
 	print_eths();
@@ -388,6 +409,18 @@ int do_bdinfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	printf("DSP frequency = %ld MHz\n", gd->bd->bi_dsp_freq);
 	printf("DDR frequency = %ld MHz\n", gd->bd->bi_ddr_freq);
 #endif
+	/* Memory used by U-Boot configuration */
+	{
+		void *sp;
+		__asm__ __volatile__ ("orr %0, sp, sp" : "=r" (sp));
+		printf("stack_cur     = 0x%p\n", sp);
+		printf("board_data    = 0x%p\n", bd);
+		printf("global_data   = 0x%p\n", gd);
+		printf("malloc_start  = 0x%08lx\n", mem_malloc_start);
+		printf("malloc_cur    = 0x%08lx\n", mem_malloc_brk);
+		printf("text_start    = 0x%08lx\n", (ulong)&_TEXT_BASE);
+		printf("bss_start     = 0x%08lx\n", (ulong)&__bss_start);
+	}
 	return 0;
 }
 

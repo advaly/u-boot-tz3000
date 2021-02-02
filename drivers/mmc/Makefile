@@ -37,6 +37,7 @@ COBJS-$(CONFIG_SPL_MMC_BOOT) += fsl_esdhc_spl.o
 else
 COBJS-$(CONFIG_GENERIC_MMC) += mmc_write.o
 endif
+COBJS-$(CONFIG_TZ3000_SDHCI) += tz3000_sdhci.o
 
 COBJS	:= $(COBJS-y)
 SRCS	:= $(COBJS:.o=.c)

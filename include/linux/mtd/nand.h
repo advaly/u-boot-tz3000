@@ -121,6 +121,7 @@ extern void nand_wait_ready(struct mtd_info *mtd);
 /* Status bits */
 #define NAND_STATUS_FAIL	0x01
 #define NAND_STATUS_FAIL_N1	0x02
+#define NAND_CHIP_READ_STATUS	0x08  /* for BENAND */
 #define NAND_STATUS_TRUE_READY	0x20
 #define NAND_STATUS_READY	0x40
 #define NAND_STATUS_WP		0x80
@@ -135,6 +136,7 @@ typedef enum {
 	NAND_ECC_HW_SYNDROME,
 	NAND_ECC_HW_OOB_FIRST,
 	NAND_ECC_SOFT_BCH,
+	NAND_ECC_BENAND,
 } nand_ecc_modes_t;
 
 /*
@@ -561,6 +563,9 @@ struct nand_chip {
 	struct nand_bbt_descr *badblock_pattern;
 
 	void *priv;
+	int man_id;
+	int dev_id;
+	int ext_id;
 };
 
 /*

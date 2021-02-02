@@ -110,9 +110,7 @@ extern int jedec_flash_match(flash_info_t *info, ulong base);
 #define CFI_CMDSET_AMD_LEGACY		0xFFF0
 #endif
 
-#if defined(CONFIG_SYS_FLASH_CFI)
 extern flash_info_t *flash_get_info(ulong base);
-#endif
 
 /*-----------------------------------------------------------------------
  * return codes from flash_write():
@@ -476,6 +474,7 @@ extern flash_info_t *flash_get_info(ulong base);
 #define FLASH_MAN_SHARP 0x00500000
 #define FLASH_MAN_ATM	0x00600000
 #define FLASH_MAN_CFI	0x01000000
+#define FLASH_MAN_SPI	0x02000000
 
 
 #define FLASH_TYPEMASK	0x0000FFFF	/* extract FLASH type	information	*/

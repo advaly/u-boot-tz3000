@@ -21,7 +21,31 @@
  **************************************************************************
  */
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+# ifdef CONFIG_ENV_IS_EMBEDDED
+#  error "Both CONFIG_ENV_IS_SELECTABLE and CONFIG_ENV_IS_EMBEDDED defined"
+# endif
+# ifdef CONFIG_ENV_IS_NOWHERE
+#  error "Both CONFIG_ENV_IS_SELECTABLE and CONFIG_ENV_IS_NOWHERE defined"
+# endif
+#endif
+
 #if defined(CONFIG_ENV_IS_IN_FLASH)
+# ifdef CONFIG_ENV_IS_SELECTABLE
+#  ifndef	CONFIG_ENV_ADDR_IN_FLASH
+#   define	CONFIG_ENV_ADDR_IN_FLASH	\
+		(CONFIG_SYS_FLASH_BASE + CONFIG_ENV_OFFSET_IN_FLASH)
+#  endif
+#  ifndef	CONFIG_ENV_OFFSET_IN_FLASH
+#   define	CONFIG_ENV_OFFSET_IN_FLASH	\
+		(CONFIG_ENV_ADDR_IN_FLASH - CONFIG_SYS_FLASH_BASE)
+#  endif
+#  if !defined(CONFIG_ENV_ADDR_REDUND_IN_FLASH) && \
+	defined(CONFIG_ENV_OFFSET_REDUND_IN_FLASH)
+#   define	CONFIG_ENV_ADDR_REDUND_IN_FLASH	\
+		(CONFIG_SYS_FLASH_BASE + CONFIG_ENV_OFFSET_REDUND_IN_FLASH)
+#  endif
+# else /* !CONFIG_ENV_IS_SELECTABLE */
 # ifndef	CONFIG_ENV_ADDR
 #  define	CONFIG_ENV_ADDR	(CONFIG_SYS_FLASH_BASE + CONFIG_ENV_OFFSET)
 # endif
@@ -32,6 +56,7 @@
 #  define	CONFIG_ENV_ADDR_REDUND	\
 		(CONFIG_SYS_FLASH_BASE + CONFIG_ENV_OFFSET_REDUND)
 # endif
+# endif /* !CONFIG_ENV_IS_SELECTABLE */
 # if defined(CONFIG_ENV_SECT_SIZE) || defined(CONFIG_ENV_SIZE)
 #  ifndef	CONFIG_ENV_SECT_SIZE
 #   define	CONFIG_ENV_SECT_SIZE	CONFIG_ENV_SIZE
@@ -42,15 +67,20 @@
 # else
 #  error "Both CONFIG_ENV_SECT_SIZE and CONFIG_ENV_SIZE undefined"
 # endif
-# if defined(CONFIG_ENV_ADDR_REDUND) && !defined(CONFIG_ENV_SIZE_REDUND)
+# if (defined(CONFIG_ENV_ADDR_REDUND) || \
+	defined(CONFIG_ENV_ADDR_REDUND_IN_FLASH)) && \
+	!defined(CONFIG_ENV_SIZE_REDUND)
 #  define CONFIG_ENV_SIZE_REDUND	CONFIG_ENV_SIZE
 # endif
-# if	(CONFIG_ENV_ADDR >= CONFIG_SYS_MONITOR_BASE) &&		\
+# if	!defined(CONFIG_ENV_IS_SELECTABLE) && \
+	(CONFIG_ENV_ADDR >= CONFIG_SYS_MONITOR_BASE) &&		\
 	(CONFIG_ENV_ADDR + CONFIG_ENV_SIZE) <=			\
 	(CONFIG_SYS_MONITOR_BASE + CONFIG_SYS_MONITOR_LEN)
 #  define ENV_IS_EMBEDDED
 # endif
-# if defined(CONFIG_ENV_ADDR_REDUND) || defined(CONFIG_ENV_OFFSET_REDUND)
+# if defined(CONFIG_ENV_ADDR_REDUND) || defined(CONFIG_ENV_OFFSET_REDUND) || \
+	defined(CONFIG_ENV_ADDR_REDUND_IN_FLASH) || \
+	defined(CONFIG_ENV_OFFSET_REDUND_IN_FLASH)
 #  define CONFIG_SYS_REDUNDAND_ENVIRONMENT
 # endif
 # ifdef CONFIG_ENV_IS_EMBEDDED
@@ -60,24 +90,34 @@
 #endif	/* CONFIG_ENV_IS_IN_FLASH */
 
 #if defined(CONFIG_ENV_IS_IN_MMC)
-# ifdef CONFIG_ENV_OFFSET_REDUND
+# if defined(CONFIG_ENV_OFFSET_REDUND) || \
+	defined(CONFIG_ENV_OFFSET_REDUND_IN_MMC)
 #  define CONFIG_SYS_REDUNDAND_ENVIRONMENT
 # endif
 #endif
 
 #if defined(CONFIG_ENV_IS_IN_NAND)
 # if defined(CONFIG_ENV_OFFSET_OOB)
-#  ifdef CONFIG_ENV_OFFSET_REDUND
+#  if defined(CONFIG_ENV_OFFSET_REDUND) || \
+	defined(CONFIG_ENV_OFFSET_REDUND_IN_NAND)
 #   error "CONFIG_ENV_OFFSET_REDUND is not supported when CONFIG_ENV_OFFSET_OOB"
 #   error "is set"
 #  endif
 extern unsigned long nand_env_oob_offset;
 #  define CONFIG_ENV_OFFSET nand_env_oob_offset
 # else
+# ifdef CONFIG_ENV_IS_SELECTABLE
+#  ifndef CONFIG_ENV_OFFSET_IN_NAND
+#   error "Need to define CONFIG_ENV_OFFSET_IN_NAND"
+#   error "when using CONFIG_ENV_IS_IN_NAND"
+#  endif
+# else /* !CONFIG_ENV_IS_SELECTABLE */
 #  ifndef CONFIG_ENV_OFFSET
 #   error "Need to define CONFIG_ENV_OFFSET when using CONFIG_ENV_IS_IN_NAND"
 #  endif
-#  ifdef CONFIG_ENV_OFFSET_REDUND
+# endif /* !CONFIG_ENV_IS_SELECTABLE */
+#  if defined(CONFIG_ENV_OFFSET_REDUND) || \
+	defined(CONFIG_ENV_OFFSET_REDUND_IN_NAND)
 #   define CONFIG_SYS_REDUNDAND_ENVIRONMENT
 #  endif
 # endif /* CONFIG_ENV_OFFSET_OOB */
@@ -143,7 +183,9 @@ extern unsigned long nand_env_oob_offset;
 #endif
 
 #if defined(CONFIG_CMD_SAVEENV) && !defined(CONFIG_ENV_IS_NOWHERE)
+#ifndef CONFIG_ENV_IS_SELECTABLE
 extern char *env_name_spec;
+#endif /* !CONFIG_ENV_IS_SELECTABLE */
 #endif
 
 #define ENV_SIZE (CONFIG_ENV_SIZE - ENV_HEADER_SIZE)
@@ -161,7 +203,9 @@ extern env_t environment;
 #endif /* ENV_IS_EMBEDDED */
 
 extern const unsigned char default_environment[];
+#ifndef CONFIG_ENV_IS_SELECTABLE
 extern env_t *env_ptr;
+#endif
 
 extern void env_relocate_spec(void);
 extern unsigned char env_get_char_spec(int);
@@ -202,5 +246,22 @@ int set_default_vars(int nvars, char * const vars[]);
 int env_import(const char *buf, int check);
 
 #endif /* DO_DEPS_ONLY */
+
+#ifdef CONFIG_ENV_IS_SELECTABLE
+struct env_ops {
+	char *env_name_spec;
+	int (*env_init)(void);
+	void (*env_relocate_spec)(void);
+	unsigned char (*env_get_char_spec)(int index);
+#ifdef CONFIG_CMD_SAVEENV
+	int (*saveenv)(void);
+#endif
+};
+extern struct env_ops *env_ops;
+extern struct env_ops flash_env_ops;
+extern struct env_ops nand_env_ops;
+extern struct env_ops mmc_env_ops;
+extern struct env_ops spi_flash_env_ops;
+#endif /* CONFIG_ENV_IS_SELECTABLE */
 
 #endif /* _ENVIRONMENT_H_ */

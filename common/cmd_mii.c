@@ -434,3 +434,54 @@ U_BOOT_CMD(
 	"mii dump   <addr> <reg>        - pretty-print <addr> <reg> (0-5 only)\n"
 	"Addr and/or reg may be ranges, e.g. 2-7."
 );
+
+#if defined(CONFIG_TZ3000_EMAC) && !defined(CONFIG_TZ3000_ETH_AUTONEG)
+#define MII_ANAR 0x04
+static int do_eth_start(cmd_tbl_t *cmdtp, int flag,
+			int argc, char * const argv[])
+{
+	unsigned char	addr;
+	int		rcode = 0;
+	const char	*devname;
+
+	addr = CONFIG_TZ3000_PHY_ADDR;
+
+	/* use current device */
+	devname = miiphy_get_current_dev();
+
+	/* phy reset */
+	if (miiphy_write(devname, addr, MII_BMCR, 0x8000) != 0) {
+		printf("Error writing to the PHY addr=%02x reg=%02x\n",
+		       addr, MII_BMCR);
+		rcode = 1;
+	}
+	/* ANAR set */
+	if (miiphy_write(devname, addr, MII_ADVERTISE, 0x01E1) != 0) {
+		printf("Error writing to the PHY addr=%02x reg=%02x\n",
+		       addr, MII_ADVERTISE);
+		rcode = 1;
+	}
+
+	/* disable 1000M */
+	if (miiphy_write(devname, addr, MII_CTRL1000, 0x0000) != 0) {
+		printf("Error writing to the PHY addr=%02x reg=%02x\n",
+		       addr, MII_CTRL1000);
+		rcode = 1;
+	}
+
+	/* autoneg start */
+	if (miiphy_write(devname, addr, MII_BMCR, 0x1200) != 0) {
+		printf("Error writing to the PHY addr=%02x reg=%02x\n",
+		       addr, MII_BMCR);
+		rcode = 1;
+	}
+
+	return rcode;
+}
+
+U_BOOT_CMD(
+	ethstart, 1, 0, do_eth_start,
+	"Ethernet Autoneg commands",
+	"Ethernet Autoneg commands"
+);
+#endif

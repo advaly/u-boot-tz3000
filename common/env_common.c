@@ -31,8 +31,10 @@ static uchar __env_get_char_spec(int index)
 {
 	return *((uchar *)(gd->env_addr + index));
 }
+#ifndef CONFIG_ENV_IS_SELECTABLE
 uchar env_get_char_spec(int)
 	__attribute__((weak, alias("__env_get_char_spec")));
+#endif /* !CONFIG_ENV_IS_SELECTABLE */
 
 static uchar env_get_char_init(int index)
 {
@@ -222,3 +224,49 @@ int env_complete(char *var, int maxv, char *cmdv[], int bufsz, char *buf)
 	return found;
 }
 #endif
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int default_env_init(void)
+{
+	gd->env_addr  = (ulong)&default_environment[0];
+	gd->env_valid = 0;
+	return 0;
+}
+static void default_env_relocate_spec(void)
+{
+}
+#ifdef CONFIG_CMD_SAVEENV
+static int default_saveenv(void)
+{
+	return -1;
+}
+#endif
+static struct env_ops default_env_ops = {
+	.env_name_spec = "default",
+	.env_init = default_env_init,
+	.env_relocate_spec = default_env_relocate_spec,
+#ifdef CONFIG_CMD_SAVEENV
+	.saveenv = default_saveenv,
+#endif
+};
+struct env_ops *env_ops = &default_env_ops;
+int env_init(void)
+{
+	return env_ops->env_init();
+}
+void env_relocate_spec(void)
+{
+	env_ops->env_relocate_spec();
+}
+uchar env_get_char_spec(int index)
+{
+	if (env_ops->env_get_char_spec)
+		return env_ops->env_get_char_spec(index);
+	return __env_get_char_spec(index);
+}
+#ifdef CONFIG_CMD_SAVEENV
+int saveenv(void)
+{
+	return env_ops->saveenv();
+}
+#endif
+#endif /* CONFIG_ENV_IS_SELECTABLE */

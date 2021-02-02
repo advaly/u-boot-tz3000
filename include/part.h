@@ -38,6 +38,10 @@ typedef struct block_dev_desc {
 				       lbaint_t start,
 				       lbaint_t blkcnt);
 	void		*priv;		/* driver private struct pointer */
+	unsigned long	(*block_readpages)(int dev,
+					   lbaint_t start,
+					   lbaint_t blkcnt,
+					   void *buffer);
 }block_dev_desc_t;
 
 #define BLOCK_CNT(size, block_dev_desc) (PAD_COUNT(size, block_dev_desc->blksz))

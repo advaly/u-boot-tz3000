@@ -21,6 +21,7 @@
  * will not allocate storage for arrays of size 0
  */
 
+#ifndef __ASSEMBLY__
 #include <linux/types.h>
 
 #if !defined(CONFIG_SYS_NS16550_REG_SIZE) || (CONFIG_SYS_NS16550_REG_SIZE == 0)
@@ -75,6 +76,7 @@ struct NS16550 {
 #define dlm ier
 
 typedef struct NS16550 *NS16550_t;
+#endif /* __ASSEMBLY__ */
 
 /*
  * These are the definitions for the FIFO Control Register
@@ -171,8 +173,10 @@ typedef struct NS16550 *NS16550_t;
 /* useful defaults for LCR */
 #define UART_LCR_8N1	0x03
 
+#ifndef __ASSEMBLY__
 void NS16550_init(NS16550_t com_port, int baud_divisor);
 void NS16550_putc(NS16550_t com_port, char c);
 char NS16550_getc(NS16550_t com_port);
 int NS16550_tstc(NS16550_t com_port);
 void NS16550_reinit(NS16550_t com_port, int baud_divisor);
+#endif /* __ASSEMBLY__ */

@@ -139,4 +139,29 @@ int spi_flash_read_common(struct spi_flash *flash, const u8 *cmd,
 int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 		size_t len, void *data);
 
+#ifdef CONFIG_SPI_FLASH_4BYTE_MODE
+static inline int spi_flash_use_4byte_mode(struct spi_flash *flash)
+{
+	return NULL != flash->set_4byte_mode;
+}
+
+static inline int spi_flash_set_4byte_mode(struct spi_flash *flash)
+{
+	if (spi_flash_use_4byte_mode(flash))
+		return flash->set_4byte_mode(flash);
+
+	return 0;
+}
+#else
+static inline int spi_flash_use_4byte_mode(struct spi_flash *flash)
+{
+	return 0;
+}
+
+static inline int spi_flash_set_4byte_mode(struct spi_flash *flash)
+{
+	return 0;
+}
+#endif
+
 #endif /* _SF_INTERNAL_H_ */

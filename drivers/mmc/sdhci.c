@@ -12,6 +12,7 @@
 #include <malloc.h>
 #include <mmc.h>
 #include <sdhci.h>
+#include <linux/err.h>
 
 void *aligned_buffer;
 
@@ -19,6 +20,10 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 {
 	unsigned long timeout;
 
+	if (host->reset) {
+		host->reset(host, mask);
+		return;
+	}
 	/* Wait max 100 ms */
 	timeout = 100;
 	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
@@ -78,11 +83,20 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data,
 	mask = SDHCI_DATA_AVAILABLE | SDHCI_SPACE_AVAILABLE;
 	do {
 		stat = sdhci_readl(host, SDHCI_INT_STATUS);
+#ifdef CONFIG_MMC_ADMA
+		if (stat & SDHCI_INT_ADMA_ERROR) {
+			printf("ADMA Error detected in status(0x%X)!\n", stat);
+			printf("ADMA Error status 0x%x\n",
+			       sdhci_readl(host, SDHCI_ADMA_ERROR));
+			return -1;
+		}
+#endif
 		if (stat & SDHCI_INT_ERROR) {
 			printf("Error detected in status(0x%X)!\n", stat);
 			return -1;
 		}
-		if (stat & rdy) {
+		if (!(data->flags & MMC_DATA_READPAGES) &&
+		    (stat & rdy)) {
 			if (!(sdhci_readl(host, SDHCI_PRESENT_STATE) & mask))
 				continue;
 			sdhci_writel(host, rdy, SDHCI_INT_STATUS);
@@ -109,6 +123,75 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data,
 	return 0;
 }
 
+#ifdef CONFIG_MMC_ADMA
+static void sdhci_set_adma_desc(u32 *desc, u32 addr, int len, unsigned cmd)
+{
+	__le32 *dataddr = (__le32 *)(desc + 1);
+	__le16 *cmdlen = (__le16 *)desc;
+
+	/* SDHCI specification says ADMA descriptors should be 4 byte
+	 * aligned, so using 16 or 32bit operations should be safe. */
+
+	cmdlen[0] = cpu_to_le16(cmd);
+	cmdlen[1] = cpu_to_le16(len);
+
+	dataddr[0] = cpu_to_le32(addr);
+}
+
+static void sdhci_adma_table_pre(struct sdhci_host *host,
+				 unsigned int start_addr,
+				 unsigned int trans_bytes)
+{
+	int i;
+	unsigned int ofs;
+	int ndesc = (trans_bytes + 65536 - 1) / 65536;
+
+	/* start_addr is always 4 byte aligned */
+	for (i = 0, ofs = 0; i < ndesc; i++, ofs += 65536) {
+		unsigned int len = trans_bytes - ofs;
+		if (len >= 65536)
+			len = 0; /* 0 means 65536 bytes */
+		sdhci_set_adma_desc(host->adma_desc[i],
+				    start_addr + ofs, len, 0x21);
+	}
+	sdhci_set_adma_desc(host->adma_desc[i],
+			    0, 0, 0x3); /* nop, end, valid */
+	flush_cache((unsigned int)host->adma_desc,
+		    sizeof(host->adma_desc[0]) * (ndesc + 1));
+}
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
+static int sdhci_adma_table_pre_pages(struct sdhci_host *host,
+				      void **pages,
+				      unsigned int trans_bytes)
+{
+	int i;
+	unsigned int ofs;
+	int ndesc = (trans_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+
+	if (ndesc > SDHCI_ADMA_MAX_DESC) {
+		printf("Too many pages for ADMA\n");
+		return -1;
+	}
+	/* start_addr is always 4 byte aligned */
+	for (i = 0, ofs = 0; i < ndesc; i++, ofs += PAGE_SIZE) {
+		unsigned int len = trans_bytes - ofs;
+		if (len > PAGE_SIZE)
+			len = PAGE_SIZE;
+		sdhci_set_adma_desc(host->adma_desc[i],
+				    *pages, len, 0x21);
+		pages++;
+	}
+	sdhci_set_adma_desc(host->adma_desc[i],
+			    0, 0, 0x3); /* nop, end, valid */
+	flush_cache((unsigned int)host->adma_desc,
+		    sizeof(host->adma_desc[0]) * (ndesc + 1));
+	return 0;
+}
+#endif
+
 int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 		       struct mmc_data *data)
 {
@@ -119,6 +202,9 @@ int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	u32 mask, flags, mode;
 	unsigned int timeout, start_addr = 0;
 	unsigned int retry = 10000;
+#ifdef CONFIG_MMC_ADMA
+	unsigned char ctrl;
+#endif
 
 	/* Wait max 10 ms */
 	timeout = 10;
@@ -166,7 +252,7 @@ int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 		if (data->blocks > 1)
 			mode |= SDHCI_TRNS_MULTI;
 
-		if (data->flags == MMC_DATA_READ)
+		if (data->flags & MMC_DATA_READ)
 			mode |= SDHCI_TRNS_READ;
 
 #ifdef CONFIG_MMC_SDMA
@@ -184,6 +270,19 @@ int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 
 		sdhci_writel(host, start_addr, SDHCI_DMA_ADDRESS);
 		mode |= SDHCI_TRNS_DMA;
+#elif defined(CONFIG_MMC_ADMA)
+		if (data->flags & MMC_DATA_READ)
+			start_addr = (unsigned int)data->dest;
+		else
+			start_addr = (unsigned int)data->src;
+		if (data->flags & MMC_DATA_READPAGES)
+			sdhci_adma_table_pre_pages(host, (void **)start_addr,
+						   trans_bytes);
+		else
+			sdhci_adma_table_pre(host, start_addr, trans_bytes);
+		sdhci_writel(host, (unsigned int)host->adma_desc,
+			     SDHCI_ADMA_ADDRESS);
+		mode |= SDHCI_TRNS_DMA;
 #endif
 		sdhci_writew(host, SDHCI_MAKE_BLKSZ(SDHCI_DEFAULT_BOUNDARY_ARG,
 				data->blocksize),
@@ -195,6 +294,24 @@ int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	sdhci_writel(host, cmd->cmdarg, SDHCI_ARGUMENT);
 #ifdef CONFIG_MMC_SDMA
 	flush_cache(start_addr, trans_bytes);
+#elif defined(CONFIG_MMC_ADMA)
+	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+	ctrl &= ~SDHCI_CTRL_DMA_MASK;
+	if (data) {
+		if (data->flags & MMC_DATA_READPAGES) {
+			void **pages = (void **)start_addr;
+			int ofs;
+			for (ofs = 0; ofs < trans_bytes; ofs += PAGE_SIZE) {
+				flush_cache((unsigned long)*pages,
+					    min(trans_bytes - ofs, PAGE_SIZE));
+				pages++;
+			}
+		} else {
+			flush_cache(start_addr, trans_bytes);
+		}
+		ctrl |= SDHCI_CTRL_ADMA32;
+	}
+	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
 #endif
 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->cmdidx, flags), SDHCI_COMMAND);
 	do {
@@ -203,6 +320,7 @@ int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 			break;
 		if (--retry == 0)
 			break;
+		udelay(1);
 	} while ((stat & mask) != mask);
 
 	if (retry == 0) {
@@ -230,7 +348,7 @@ int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	sdhci_writel(host, SDHCI_INT_ALL_MASK, SDHCI_INT_STATUS);
 	if (!ret) {
 		if ((host->quirks & SDHCI_QUIRK_32BIT_DMA_ADDR) &&
-				!is_aligned && (data->flags == MMC_DATA_READ))
+				!is_aligned && (data->flags & MMC_DATA_READ))
 			memcpy(data->dest, aligned_buffer, trans_bytes);
 		return 0;
 	}
@@ -248,6 +366,13 @@ static int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 	struct sdhci_host *host = (struct sdhci_host *)mmc->priv;
 	unsigned int div, clk, timeout;
 
+#ifdef CONFIG_TZ3000_SDHCI
+	/* Do not stop clocks simultaneouosly */
+	clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+	if (clk & SDHCI_CLOCK_CARD_EN)
+		sdhci_writew(host, clk & ~SDHCI_CLOCK_CARD_EN,
+			     SDHCI_CLOCK_CONTROL);
+#endif
 	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
 
 	if (clock == 0)
@@ -339,6 +464,9 @@ void sdhci_set_ios(struct mmc *mmc)
 	if (host->set_control_reg)
 		host->set_control_reg(host);
 
+	if (host->enable_tuning)
+		host->enable_tuning(host, 0);
+
 	if (mmc->clock != host->clock)
 		sdhci_set_clock(mmc, mmc->clock);
 
@@ -367,12 +495,23 @@ void sdhci_set_ios(struct mmc *mmc)
 		ctrl &= ~SDHCI_CTRL_HISPD;
 
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+	if (host->enable_tuning)
+		host->enable_tuning(host, 1);
 }
 
 int sdhci_init(struct mmc *mmc)
 {
 	struct sdhci_host *host = (struct sdhci_host *)mmc->priv;
+#ifdef CONFIG_TZ3000_SDHCI
+	unsigned int timeout = 1100;
 
+	while (!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
+		if (timeout == 0)
+			return -ETIMEDOUT;
+		timeout--;
+		udelay(1000);
+	}
+#endif
 	if ((host->quirks & SDHCI_QUIRK_32BIT_DMA_ADDR) && !aligned_buffer) {
 		aligned_buffer = memalign(8, 512*1024);
 		if (!aligned_buffer) {
@@ -432,6 +571,11 @@ int add_sdhci(struct sdhci_host *host, u32 max_clk, u32 min_clk)
 		printf("Your controller don't support sdma!!\n");
 		return -1;
 	}
+#elif defined(CONFIG_MMC_ADMA)
+	if (!(caps & SDHCI_CAN_DO_ADMA2)) {
+		printf("Your controller don't support adma!!\n");
+		return -1;
+	}
 #endif
 
 	if (max_clk)
@@ -476,6 +620,9 @@ int add_sdhci(struct sdhci_host *host, u32 max_clk, u32 min_clk)
 	}
 	if (host->host_caps)
 		mmc->host_caps |= host->host_caps;
+#if defined(CONFIG_MMC_ADMA)
+	mmc->host_caps |= MMC_MODE_READPAGES;
+#endif
 
 	sdhci_reset(host, SDHCI_RESET_ALL);
 	mmc_register(mmc);

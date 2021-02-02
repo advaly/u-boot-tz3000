@@ -415,7 +415,7 @@ static unsigned long ubifs_findfile(struct super_block *sb, char *filename)
 			return 0;
 		inode = ubifs_iget(sb, inum);
 
-		if (!inode)
+		if (IS_ERR(inode))
 			return 0;
 		ui = ubifs_inode(inode);
 

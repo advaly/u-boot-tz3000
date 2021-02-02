@@ -8,7 +8,11 @@ ifeq ($(ARCH),powerpc)
 LOAD_ADDR = 0x40000
 endif
 ifeq ($(ARCH),arm)
+ifneq ($(filter $(SOC),tz3000 tz2000),)
+LOAD_ADDR = 0x80200000
+else
 LOAD_ADDR = 0x1000000
+endif
 endif
 
 include $(TOPDIR)/config.mk

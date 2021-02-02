@@ -31,7 +31,9 @@ DECLARE_GLOBAL_DATA_PTR;
 #error CONFIG_ENV_SIZE_REDUND should not be less then CONFIG_ENV_SIZE
 #endif
 
+#ifndef CONFIG_ENV_IS_SELECTABLE
 char *env_name_spec = "Flash";
+#endif
 
 #ifdef ENV_IS_EMBEDDED
 env_t *env_ptr = &environment;
@@ -40,7 +42,17 @@ static env_t *flash_addr = (env_t *)CONFIG_ENV_ADDR;
 
 #else /* ! ENV_IS_EMBEDDED */
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+#ifdef CONFIG_ENV_ADDR_IN_FLASH
+#define CONFIG_ENV_ADDR CONFIG_ENV_ADDR_IN_FLASH
+#endif
+#ifdef CONFIG_ENV_ADDR_REDUND_IN_FLASH
+#define CONFIG_ENV_ADDR_REDUND CONFIG_ENV_ADDR_REDUND_IN_FLASH
+#endif
+static env_t *env_ptr = (env_t *)CONFIG_ENV_ADDR;
+#else
 env_t *env_ptr = (env_t *)CONFIG_ENV_ADDR;
+#endif /* CONFIG_ENV_IS_SELECTABLE */
 static env_t *flash_addr = (env_t *)CONFIG_ENV_ADDR;
 #endif /* ENV_IS_EMBEDDED */
 
@@ -58,7 +70,11 @@ static ulong end_addr_new = CONFIG_ENV_ADDR_REDUND + CONFIG_ENV_SECT_SIZE - 1;
 
 
 #ifdef CONFIG_ENV_ADDR_REDUND
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int flash_env_init(void)
+#else
 int env_init(void)
+#endif
 {
 	int crc1_ok = 0, crc2_ok = 0;
 
@@ -103,7 +119,11 @@ int env_init(void)
 }
 
 #ifdef CMD_SAVEENV
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int flash_saveenv(void)
+#else
 int saveenv(void)
+#endif
 {
 	env_t	env_new;
 	ssize_t	len;
@@ -212,7 +232,11 @@ done:
 
 #else /* ! CONFIG_ENV_ADDR_REDUND */
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int flash_env_init(void)
+#else
 int env_init(void)
+#endif
 {
 	if (crc32(0, env_ptr->data, ENV_SIZE) == env_ptr->crc) {
 		gd->env_addr	= (ulong)&(env_ptr->data);
@@ -226,7 +250,11 @@ int env_init(void)
 }
 
 #ifdef CMD_SAVEENV
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int flash_saveenv(void)
+#else
 int saveenv(void)
+#endif
 {
 	env_t	env_new;
 	ssize_t	len;
@@ -301,7 +329,11 @@ done:
 
 #endif /* CONFIG_ENV_ADDR_REDUND */
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static void flash_env_relocate_spec(void)
+#else
 void env_relocate_spec(void)
+#endif
 {
 #ifdef CONFIG_ENV_ADDR_REDUND
 	if (gd->env_addr != (ulong)&(flash_addr->data)) {
@@ -346,3 +378,14 @@ void env_relocate_spec(void)
 
 	env_import((char *)flash_addr, 1);
 }
+
+#ifdef CONFIG_ENV_IS_SELECTABLE
+struct env_ops flash_env_ops = {
+	.env_name_spec = "Flash",
+	.env_init = flash_env_init,
+	.env_relocate_spec = flash_env_relocate_spec,
+#ifdef CONFIG_CMD_SAVEENV
+	.saveenv = flash_saveenv,
+#endif
+};
+#endif /* CONFIG_ENV_IS_SELECTABLE */

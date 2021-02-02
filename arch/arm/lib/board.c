@@ -56,6 +56,9 @@ extern void dataflash_print_info(void);
 	defined(CONFIG_SYS_I2C)
 #include <i2c.h>
 #endif
+#if defined(CONFIG_HARD_SPI)
+#include <spi.h>
+#endif
 
 /************************************************************************
  * Coloured LED functionality
@@ -163,6 +166,16 @@ static int init_func_i2c(void)
 }
 #endif
 
+#if defined(CONFIG_HARD_SPI)
+static int init_func_spi(void)
+{
+	puts("SPI:   ");
+	spi_init();
+	puts("ready\n");
+	return 0;
+}
+#endif
+
 #if defined(CONFIG_CMD_PCI) || defined (CONFIG_PCI)
 #include <pci.h>
 static int arm_pci_init(void)
@@ -258,6 +271,9 @@ init_fnc_t *init_sequence[] = {
 #endif
 #if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C)
 	init_func_i2c,
+#endif
+#if defined(CONFIG_HARD_SPI)
+	init_func_spi,
 #endif
 	dram_init,		/* configure available RAM banks */
 	NULL,
@@ -575,7 +591,9 @@ void board_init_r(gd_t *id, ulong dest_addr)
 # endif /* CONFIG_SYS_FLASH_CHECKSUM */
 	} else {
 		puts(failed);
+#ifndef CONFIG_SYS_FLASH_OPTIONAL
 		hang();
+#endif
 	}
 #endif
 

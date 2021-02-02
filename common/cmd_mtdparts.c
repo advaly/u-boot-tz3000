@@ -2060,7 +2060,7 @@ static char mtdparts_help_text[] =
 	"    - delete all partitions\n"
 	"mtdparts del part-id\n"
 	"    - delete partition (e.g. part-id = nand0,1)\n"
-	"mtdparts add <mtd-dev> <size>[@<offset>] [<name>] [ro]\n"
+	"mtdparts add <mtd-dev> <size>[@<offset>] <name> [ro]\n"
 	"    - add partition\n"
 #if defined(CONFIG_CMD_MTDPARTS_SPREAD)
 	"mtdparts add.spread <mtd-dev> <size>[@<offset>] [<name>] [ro]\n"

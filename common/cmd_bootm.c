@@ -493,12 +493,26 @@ static int bootm_start_standalone(int argc, char * const argv[])
 	int   (*appl)(int, char * const []);
 
 	/* Don't start if "autostart" is set to "no" */
+	setenv_hex("filesize", images.os.image_len);
 	if (((s = getenv("autostart")) != NULL) && (strcmp(s, "no") == 0)) {
-		setenv_hex("filesize", images.os.image_len);
 		return 0;
 	}
-	appl = (int (*)(int, char * const []))(ulong)ntohl(images.ep);
+	appl = (int (*)(int, char * const []))(images.ep);
+#ifdef CONFIG_STANDALONE_ENABLE_CACHE
+	flush_dcache_all();
+	invalidate_dcache_all();
+	invalidate_icache_all();
+#elif defined(CONFIG_STANDALONE_DISABLE_CACHE)
+	cleanup_before_linux();
+#endif
+#ifdef CONFIG_DISPLAY_BOOTTIME
+	if (getenv("boottime") && getenv("bootcmd"))
+		boottime();
+#endif
 	(*appl)(argc, argv);
+#ifdef CONFIG_STANDALONE_DISABLE_CACHE
+	setup_after_linux();
+#endif
 	return 0;
 }
 

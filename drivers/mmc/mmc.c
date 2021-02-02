@@ -189,8 +189,11 @@ struct mmc *find_mmc_device(int dev_num)
 	return NULL;
 }
 
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
 static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
-			   lbaint_t blkcnt)
+			   lbaint_t blkcnt, int readpages)
 {
 	struct mmc_cmd cmd;
 	struct mmc_data data;
@@ -211,6 +214,8 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 	data.blocks = blkcnt;
 	data.blocksize = mmc->read_bl_len;
 	data.flags = MMC_DATA_READ;
+	if (readpages)
+		data.flags |= MMC_DATA_READPAGES;
 
 	if (mmc_send_cmd(mmc, &cmd, &data))
 		return 0;
@@ -230,7 +235,8 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 	return blkcnt;
 }
 
-static ulong mmc_bread(int dev_num, lbaint_t start, lbaint_t blkcnt, void *dst)
+static ulong _mmc_bread(int dev_num, lbaint_t start, lbaint_t blkcnt, void *dst,
+			int readpages)
 {
 	lbaint_t cur, blocks_todo = blkcnt;
 
@@ -253,15 +259,33 @@ static ulong mmc_bread(int dev_num, lbaint_t start, lbaint_t blkcnt, void *dst)
 		return 0;
 
 	do {
-		cur = (blocks_todo > mmc->b_max) ?  mmc->b_max : blocks_todo;
-		if(mmc_read_blocks(mmc, dst, start, cur) != cur)
+		uint b_max = mmc->b_max;
+		if (readpages)
+			b_max &= ~(PAGE_SIZE / mmc->read_bl_len - 1);
+		cur = (blocks_todo > b_max) ?  b_max : blocks_todo;
+		if (mmc_read_blocks(mmc, dst, start, cur, readpages) != cur)
 			return 0;
 		blocks_todo -= cur;
 		start += cur;
-		dst += cur * mmc->read_bl_len;
+		if (readpages)
+			dst += cur * mmc->read_bl_len / PAGE_SIZE *
+				sizeof(void *);
+		else
+			dst += cur * mmc->read_bl_len;
 	} while (blocks_todo > 0);
 
 	return blkcnt;
+}
+
+static ulong mmc_bread(int dev_num, lbaint_t start, lbaint_t blkcnt, void *dst)
+{
+	return _mmc_bread(dev_num, start, blkcnt, dst, 0);
+}
+
+static ulong mmc_breadpages(int dev_num, lbaint_t start, lbaint_t blkcnt,
+			    void *dst)
+{
+	return _mmc_bread(dev_num, start, blkcnt, dst, 1);
 }
 
 static int mmc_go_idle(struct mmc *mmc)
@@ -848,6 +872,12 @@ static int mmc_startup(struct mmc *mmc)
 
 	if (mmc->version == MMC_VERSION_UNKNOWN) {
 		int version = (cmd.response[0] >> 26) & 0xf;
+#ifdef CONFIG_TZ3000_SDHCI
+		if (strcmp(mmc->name, "eMMC8sd-nand") == 0 && version == 0) {
+			debug("Fix mmc version (0 to 4)\n");
+			version = 4;
+		}
+#endif
 
 		switch (version) {
 			case 0:
@@ -1097,6 +1127,12 @@ static int mmc_startup(struct mmc *mmc)
 			else
 				mmc->tran_speed = 26000000;
 		}
+#ifdef CONFIG_TZ3000_SDHCI
+		if (strcmp(mmc->name, "eMMC8sd-nand") == 0) {
+			mmc->tran_speed = 100000000;
+			debug("Fix speed %d\n", mmc->tran_speed);
+		}
+#endif
 	}
 
 	mmc_set_clock(mmc, mmc->tran_speed);
@@ -1159,6 +1195,8 @@ int mmc_register(struct mmc *mmc)
 	mmc->block_dev.dev = cur_dev_num++;
 	mmc->block_dev.removable = 1;
 	mmc->block_dev.block_read = mmc_bread;
+	if (mmc->host_caps & MMC_MODE_READPAGES)
+		mmc->block_dev.block_readpages = mmc_breadpages;
 	mmc->block_dev.block_write = mmc_bwrite;
 	mmc->block_dev.block_erase = mmc_berase;
 	if (!mmc->b_max)

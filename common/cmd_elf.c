@@ -34,6 +34,13 @@ unsigned long do_bootelf_exec(ulong (*entry)(int, char * const[]),
 {
 	unsigned long ret;
 
+#ifdef CONFIG_STANDALONE_ENABLE_CACHE
+	flush_dcache_all();
+	invalidate_dcache_all();
+	invalidate_icache_all();
+#elif defined(CONFIG_STANDALONE_DISABLE_CACHE)
+	cleanup_before_linux();
+#else
 	/*
 	 * QNX images require the data cache is disabled.
 	 * Data cache is already flushed, so just turn it off.
@@ -41,6 +48,7 @@ unsigned long do_bootelf_exec(ulong (*entry)(int, char * const[]),
 	int dcache = dcache_status();
 	if (dcache)
 		dcache_disable();
+#endif
 
 	/*
 	 * pass address parameter as argv[0] (aka command name),
@@ -48,8 +56,13 @@ unsigned long do_bootelf_exec(ulong (*entry)(int, char * const[]),
 	 */
 	ret = entry(argc, argv);
 
+#ifdef CONFIG_STANDALONE_DISABLE_CACHE
+	setup_after_linux();
+#elif defined(CONFIG_STANDALONE_DISABLE_CACHE)
+#else
 	if (dcache)
 		dcache_enable();
+#endif
 
 	return ret;
 }

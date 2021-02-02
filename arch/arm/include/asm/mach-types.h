@@ -1106,6 +1106,15 @@ extern unsigned int __machine_arch_type;
 #define MACH_TYPE_OMAP5_SEVM           3777
 #define MACH_TYPE_ARMADILLO_800EVA     3863
 #define MACH_TYPE_KZM9G                4140
+#define MACH_TYPE_TZ2000RB3            999986
+#define MACH_TYPE_TZ2000RB2            999987
+#define MACH_TYPE_TZ2000RB             999988
+#define MACH_TYPE_TZ2000EVA            999989
+#define MACH_TYPE_TZ3000RB4            999995
+#define MACH_TYPE_TZ3000RB3            999996
+#define MACH_TYPE_TZ3000RB2            999997
+#define MACH_TYPE_TZ3000RB             999998
+#define MACH_TYPE_TZ3000EVA            999999
 
 #ifdef CONFIG_ARCH_EBSA110
 # ifdef machine_arch_type
@@ -14233,6 +14242,114 @@ extern unsigned int __machine_arch_type;
 # define machine_is_kzm9g()	(machine_arch_type == MACH_TYPE_KZM9G)
 #else
 # define machine_is_kzm9g()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ2000RB3
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ2000RB3
+# endif
+# define machine_is_tz2000rb3()	(machine_arch_type == MACH_TYPE_TZ2000RB3)
+#else
+# define machine_is_tz2000rb3()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ2000RB2
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ2000RB2
+# endif
+# define machine_is_tz2000rb2()	(machine_arch_type == MACH_TYPE_TZ2000RB2)
+#else
+# define machine_is_tz2000rb2()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ2000RB
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ2000RB
+# endif
+# define machine_is_tz2000rb()	(machine_arch_type == MACH_TYPE_TZ2000RB)
+#else
+# define machine_is_tz2000rb()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ2000EVA
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ2000EVA
+# endif
+# define machine_is_tz2000eva()	(machine_arch_type == MACH_TYPE_TZ2000EVA)
+#else
+# define machine_is_tz2000eva()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ3000RB4
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ3000RB4
+# endif
+# define machine_is_tz3000rb4()	(machine_arch_type == MACH_TYPE_TZ3000RB4)
+#else
+# define machine_is_tz3000rb4()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ3000RB3
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ3000RB3
+# endif
+# define machine_is_tz3000rb3()	(machine_arch_type == MACH_TYPE_TZ3000RB3)
+#else
+# define machine_is_tz3000rb3()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ3000RB2
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ3000RB2
+# endif
+# define machine_is_tz3000rb2()	(machine_arch_type == MACH_TYPE_TZ3000RB2)
+#else
+# define machine_is_tz3000rb2()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ3000RB
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ3000RB
+# endif
+# define machine_is_tz3000rb()	(machine_arch_type == MACH_TYPE_TZ3000RB)
+#else
+# define machine_is_tz3000rb()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TZ3000EVA
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TZ3000EVA
+# endif
+# define machine_is_tz3000eva()	(machine_arch_type == MACH_TYPE_TZ3000EVA)
+#else
+# define machine_is_tz3000eva()	(0)
 #endif
 
 /*

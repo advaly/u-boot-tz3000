@@ -68,3 +68,12 @@ int cleanup_before_linux(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_HAS_SETUP_AFTER_LINUX
+int setup_after_linux(void)
+{
+	enable_interrupts();
+	enable_caches();
+	return 0;
+}
+#endif /* CONFIG_HAS_SETUP_AFTER_LINUX */

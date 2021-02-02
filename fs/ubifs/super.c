@@ -852,6 +852,7 @@ void ubifs_umount(struct ubifs_info *c)
 		free(ubifs_sb->s_fs_info);
 		free(ubifs_sb);
 	}
+	ubifs_sb = NULL;
 }
 
 /**

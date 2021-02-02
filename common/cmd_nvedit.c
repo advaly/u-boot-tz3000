@@ -689,7 +689,11 @@ ulong getenv_ulong(const char *name, int base, ulong default_val)
 static int do_env_save(cmd_tbl_t *cmdtp, int flag, int argc,
 		       char * const argv[])
 {
+#ifdef CONFIG_ENV_IS_SELECTABLE
+	printf("Saving Environment to %s...\n", env_ops->env_name_spec);
+#else
 	printf("Saving Environment to %s...\n", env_name_spec);
+#endif
 
 	return saveenv() ? 1 : 0;
 }

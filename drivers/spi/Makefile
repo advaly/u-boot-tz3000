@@ -41,6 +41,7 @@ COBJS-$(CONFIG_TEGRA114_SPI) += tegra114_spi.o
 COBJS-$(CONFIG_TI_QSPI) += ti_qspi.o
 COBJS-$(CONFIG_XILINX_SPI) += xilinx_spi.o
 COBJS-$(CONFIG_ZYNQ_SPI) += zynq_spi.o
+COBJS-$(CONFIG_TZ3000_SPI) += tz3000_spi.o
 
 COBJS	:= $(COBJS-y)
 SRCS	:= $(COBJS:.o=.c)

@@ -308,13 +308,14 @@ static int do_i2c_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[
  * on error.
  *
  * Syntax:
- *	i2c md {i2c_chip} {addr}{.0, .1, .2} {len}
+ *	i2c md{.b, .w, .l} {i2c_chip} {addr}{.0, .1, .2} {len}
  */
 static int do_i2c_md ( cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	u_char	chip;
 	uint	addr, alen, length;
 	int	j, nbytes, linebytes;
+	int	size = 1;
 
 	/* We use the last specified parameters, unless new ones are
 	 * entered.
@@ -331,6 +332,7 @@ static int do_i2c_md ( cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		/*
 		 * New command specified.
 		 */
+		size = cmd_get_data_size(argv[0], 1);
 
 		/*
 		 * I2C chip address
@@ -365,6 +367,18 @@ static int do_i2c_md ( cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		unsigned char	linebuf[DISP_LINE_LEN];
 		unsigned char	*cp;
 
+		if (size != 1) {
+			__be32 data;
+			if (i2c_read(chip, addr, alen, (uchar *)&data,
+				     size) != 0)
+				puts("Error reading the chip.\n");
+			else
+				printf("%04x: %0*x\n", addr, size * 2,
+				       be32_to_cpu(data) >> ((4 - size) * 8));
+			addr += size;
+			nbytes--; /* # of objects */
+			continue;
+		}
 		linebytes = (nbytes > DISP_LINE_LEN) ? DISP_LINE_LEN : nbytes;
 
 		if (i2c_read(chip, addr, alen, linebuf, linebytes) != 0)
@@ -409,19 +423,22 @@ static int do_i2c_md ( cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
  * on error.
  *
  * Syntax:
- *	i2c mw {i2c_chip} {addr}{.0, .1, .2} {data} [{count}]
+ *	i2c mw{.b, .w, .l} {i2c_chip} {addr}{.0, .1, .2} {data} [{count}]
  */
 static int do_i2c_mw ( cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	uchar	chip;
 	ulong	addr;
 	uint	alen;
-	uchar	byte;
+	u32	data;
+	__be32	data_be;
+	int	size = 1;
 	int	count;
 
 	if ((argc < 4) || (argc > 5))
 		return CMD_RET_USAGE;
 
+	size = cmd_get_data_size(argv[0], 1);
 	/*
 	 * Chip is always specified.
 	 */
@@ -438,7 +455,9 @@ static int do_i2c_mw ( cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	/*
 	 * Value to write is always specified.
 	 */
-	byte = simple_strtoul(argv[3], NULL, 16);
+	data = simple_strtoul(argv[3], NULL, 16);
+	data = data << ((4 - size) * 8);
+	data_be = cpu_to_be32(data);
 
 	/*
 	 * Optional count
@@ -449,8 +468,9 @@ static int do_i2c_mw ( cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		count = 1;
 
 	while (count-- > 0) {
-		if (i2c_write(chip, addr++, alen, &byte, 1) != 0)
+		if (i2c_write(chip, addr, alen, (uchar *)&data_be, size) != 0)
 			puts ("Error writing the chip.\n");
+		addr += size;
 		/*
 		 * Wait for the write to complete.  The write can take
 		 * up to 10mSec (we allow a little more time).

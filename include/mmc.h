@@ -37,6 +37,7 @@
 #define MMC_MODE_8BIT		0x200
 #define MMC_MODE_SPI		0x400
 #define MMC_MODE_HC		0x800
+#define MMC_MODE_READPAGES	0x1000
 
 #define MMC_MODE_MASK_WIDTH_BITS (MMC_MODE_4BIT | MMC_MODE_8BIT)
 #define MMC_MODE_WIDTH_BITS_SHIFT 8
@@ -47,6 +48,7 @@
 
 #define MMC_DATA_READ		1
 #define MMC_DATA_WRITE		2
+#define MMC_DATA_READPAGES	4
 
 #define NO_CARD_ERR		-16 /* No SD/MMC card inserted */
 #define UNUSABLE_ERR		-17 /* Unusable Card */

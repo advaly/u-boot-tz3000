@@ -873,7 +873,7 @@ ehci_submit_root(struct usb_device *dev, unsigned long pipe, void *buffer,
 		case USB_PORT_FEAT_C_CONNECTION:
 			reg |= EHCI_PS_CSC;
 			break;
-		case USB_PORT_FEAT_OVER_CURRENT:
+		case USB_PORT_FEAT_C_OVER_CURRENT:
 			reg |= EHCI_PS_OCC;
 			break;
 		case USB_PORT_FEAT_C_RESET:

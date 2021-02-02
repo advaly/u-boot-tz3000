@@ -30,3 +30,10 @@ EXPORT_FUNC(spi_free_slave)
 EXPORT_FUNC(spi_claim_bus)
 EXPORT_FUNC(spi_release_bus)
 EXPORT_FUNC(spi_xfer)
+#ifdef CONFIG_STANDALONE_ENABLE_CACHE
+EXPORT_FUNC(invalidate_icache_all)
+EXPORT_FUNC(flush_cache)
+EXPORT_FUNC(flush_dcache_range)
+EXPORT_FUNC(invalidate_dcache_all)
+EXPORT_FUNC(invalidate_dcache_range)
+#endif

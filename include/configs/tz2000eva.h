@@ -1,0 +1,352 @@
+/*
+ * TZ2000 Evaluation Board configurations
+ *
+ * (C) Copyright 2010,2013,2014 Toshiba Corporation
+ */
+
+#ifndef __CONFIG_H
+#define __CONFIG_H
+
+#define CONFIG_TZ2000
+#define CONFIG_TZ2000_EVA
+
+#include <asm/arch/tz2000.h>
+
+/*-----------------------------------------------------------------------
+ * Debug options
+ */
+#define CONFIG_EARLY_DEBUG
+
+#define CONFIG_DISPLAY_CPUINFO
+#define CONFIG_DISPLAY_BOARDINFO
+#define CONFIG_DISPLAY_BOOTTIME
+#define CONFIG_DISPLAY_PERFORMANCE
+
+/*-----------------------------------------------------------------------
+ * CPU options
+ */
+#undef CONFIG_SYS_ICACHE_OFF
+#undef CONFIG_SYS_DCACHE_OFF
+#define CONFIG_SYS_CACHELINE_SIZE	32
+
+/*-----------------------------------------------------------------------
+ * Hardware drivers
+ */
+#define CONFIG_MII
+#define CONFIG_ARP_TIMEOUT		200UL
+#define CONFIG_NET_RETRY_COUNT		2
+
+#define CONFIG_TZ3000_EMAC
+#define CONFIG_TZ3000_EMAC_EMACDRR	0x80000000
+#define CONFIG_TZ3000_EMAC_FIFOSIZER	0x0000070F
+#define CONFIG_TZ3000_PHY_ADDR		7
+#undef CONFIG_TZ3000_ETH_AUTONEG
+
+#define CONFIG_SYS_NS16550
+#define CONFIG_SYS_NS16550_SERIAL
+#define CONFIG_SYS_NS16550_REG_SIZE	-4
+#define CONFIG_SYS_NS16550_COM1		TZ2000_UART_BASE(0)
+#define CONFIG_SYS_NS16550_COM2		TZ2000_UART_BASE(1)
+#define CONFIG_SYS_NS16550_COM3		TZ2000_UART_BASE(2)
+#define CONFIG_SYS_NS16550_COM4		TZ2000_UART_BASE(3)
+#define CONFIG_SYS_NS16550_CLK		18432000
+#ifndef CONFIG_CONS_INDEX
+#define CONFIG_CONS_INDEX		1
+#endif
+#define CONFIG_BAUDRATE			115200
+#define CONFIG_SYS_UART_CLK		18432000
+#define CONFIG_SYS_CONSOLE_IS_IN_ENV
+
+#define CONFIG_HARD_SPI
+#define CONFIG_TZ3000_SPI
+#define TZ3000_SPIC_BASE	TZ2000_SPIC_BASE
+#define CONFIG_TZ3000_SPI_SPR_BASE_FREQ		600000000
+#define CONFIG_TZ3000_SPI_DEFAULT_SPR		SPR_40MHZ
+#define CONFIG_TZ3000_SPI_MAX_SPEED	(CONFIG_TZ3000_SPI_SPR_BASE_FREQ / 0x0c)
+#define CONFIG_TZ3000_SPI_DEFAULT_CS_DEASSERT	100
+#define CONFIG_SYS_SPI_READID_HZ	(CONFIG_TZ3000_SPI_SPR_BASE_FREQ / 0x1f)
+
+#undef CONFIG_USB_EHCI_TZ2000
+#ifdef CONFIG_USB_EHCI_TZ2000
+#define CONFIG_USB_EHCI
+#define CONFIG_USB_STORAGE
+#endif
+/*-----------------------------------------------------------------------
+ * Command line configuration
+ */
+#include <config_cmd_default.h>
+#define CONFIG_CMD_SAVES
+#define CONFIG_CMD_UNZIP
+#define CONFIG_CMD_MD5SUM
+#define CONFIG_CMD_SHA1SUM
+#define CONFIG_MD5
+#define CONFIG_SHA1
+
+#if defined(CONFIG_TZ3000_EMAC)
+#define TZ3000_EMAC_BASE	TZ2000_EMAC_BASE
+#define CONFIG_CMD_PING
+#define CONFIG_CMD_MII
+#define CONFIG_CMD_TFTPPUT
+#endif
+
+#ifdef CONFIG_TZ3000_SPI
+#define CONFIG_CMD_SF
+#define CONFIG_SF_DEFAULT_SPEED		CONFIG_SYS_SPI_READID_HZ
+#define CONFIG_SF_DEFAULT_MODE		SPI_MODE_0
+#endif
+
+#define CONFIG_CMD_MTDPARTS
+#define CONFIG_MTD_DEVICE
+#define CONFIG_MTD_PARTITIONS
+
+#define CONFIG_TZ3000_SDHCI
+#ifdef CONFIG_TZ3000_SDHCI
+#define CONFIG_MMC
+#define CONFIG_GENERIC_MMC
+#define CONFIG_SDHCI
+#define CONFIG_MMC_SDHCI_IO_ACCESSORS
+#define CONFIG_MMC_ADMA
+#define CONFIG_CMD_MMC
+#define CONFIG_CMD_FAT
+#define CONFIG_DOS_PARTITION
+#endif
+
+#define CONFIG_AUTO_COMPLETE
+#define CONFIG_CMDLINE_EDITING
+#define CONFIG_DISABLE_REPEATE_COMMAND
+#define CONFIG_CMD_SOURCE
+#define CONFIG_CMD_ELF
+#define CONFIG_CMD_BOOTZ
+#undef CONFIG_CMD_XIMG
+#define CONFIG_CMD_TIME
+
+#define CONFIG_CMD_SWSUSP
+#define CONFIG_LZO
+
+#ifdef CONFIG_USB_EHCI_TZ2000
+#define CONFIG_CMD_USB
+#define CONFIG_CMD_FAT
+#define CONFIG_DOS_PARTITION
+#endif
+
+#define CONFIG_HARD_I2C
+#define CONFIG_CMD_I2C
+#define CONFIG_DW_I2C
+#define IC_CLK			50	/* MHz */
+#define CONFIG_SYS_I2C_SLAVE	0
+#define CONFIG_I2C_MULTI_BUS
+#define CONFIG_SYS_I2C_SPEED	400000
+#define CONFIG_SYS_I2C_BASE	TZ2000_I2C_BASE(0)
+#define CONFIG_SYS_I2C_BASE1	TZ2000_I2C_BASE(1)
+#define CONFIG_SYS_I2C_BASE2	TZ2000_I2C_BASE(2)
+#define CONFIG_SYS_I2C_BASE3	TZ2000_I2C_BASE(3)
+#define CONFIG_SYS_I2C_BUS_MAX	4
+
+/*-----------------------------------------------------------------------
+ * Miscellaneous configurable options
+ */
+#define	CONFIG_SYS_LONGHELP
+
+#define	CONFIG_SYS_PROMPT	"u-boot # "
+#define	CONFIG_SYS_CBSIZE	1024
+#define	CONFIG_SYS_PBSIZE	\
+	(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
+#define	CONFIG_SYS_MAXARGS	16
+
+#define CONFIG_SYS_HZ		1000
+#define	CONFIG_TIMESTAMP
+
+#define CONFIG_BOOTDELAY	2
+#define CONFIG_ZERO_BOOTDELAY_CHECK
+
+#define CONFIG_SETUP_MEMORY_TAGS
+#define CONFIG_CMDLINE_TAG
+#define CONFIG_INITRD_TAG
+
+#define CONFIG_BOOTARGS	\
+	"root=/dev/nfs ip=192.168.1.2:::::eth0 nfsroot=192.168.1.1:/nfsroot console=ttyS0,115200"
+
+#define CONFIG_ETHADDR			00:11:22:33:44:55
+#define CONFIG_SERVERIP			192.168.1.1
+#define CONFIG_IPADDR			192.168.1.2
+#define CONFIG_NETMASK			255.255.255.0
+
+#define CONFIG_EXTRA_ENV_SETTINGS	\
+	"ethprime=tz3000\0"		\
+	"netretry=2\0"
+
+#define CONFIG_ENV_OVERWRITE
+
+/*-----------------------------------------------------------------------
+ * FLASH and environment organization
+ */
+#define CONFIG_SPI_FLASH
+#define CONFIG_SPI_FLASH_ATMEL
+#define CONFIG_SPI_FLASH_MACRONIX
+#define CONFIG_SPI_FLASH_SPANSION
+#define CONFIG_SPI_FLASH_SST
+#define CONFIG_SPI_FLASH_STMICRO
+#define CONFIG_SPI_FLASH_WINBOND
+#define CONFIG_SPI_FLASH_EON
+#define CONFIG_SPI_FLASH_4BYTE_MODE
+#undef CONFIG_SPI_FLASH_BAR
+
+#define CONFIG_SYS_FLASH_SPI_HIGH_PERFORMANCE_READ
+
+#define CONFIG_FLASH_SPI_DRIVER
+#define CONFIG_FLASH_CFI_MTD
+
+/* CONFIG_SYS_MONITOR_BASE is selected by make target */
+#ifndef CONFIG_SYS_MONITOR_BASE
+#define CONFIG_SYS_MONITOR_BASE		0x20000000
+#endif
+#define CONFIG_SYS_MONITOR_LEN		0x80000
+#define CONFIG_SYS_FLASH_BASE		CONFIG_SYS_MONITOR_BASE
+
+#define CONFIG_SYS_MAX_FLASH_BANKS	2
+#define CONFIG_SYS_FLASH_OPTIONAL
+#if defined(CONFIG_SPI_FLASH_BAR) || defined(CONFIG_SPI_FLASH_4BYTE_MODE)
+#define PHYS_FLASH_0_SIZE		0x04000000
+#define PHYS_FLASH_1_SIZE		0x04000000
+#else
+#define PHYS_FLASH_0_SIZE		0x01000000
+#define PHYS_FLASH_1_SIZE		0x01000000
+#endif
+#define PHYS_FLASH_0			0x20000000
+#define PHYS_FLASH_1			(PHYS_FLASH_0 + PHYS_FLASH_0_SIZE)
+#define CONFIG_SYS_FLASH_BANKS_LIST	{ \
+		PHYS_FLASH_0, PHYS_FLASH_1, \
+	}
+#if defined(CONFIG_SPI_FLASH_BAR) || defined(CONFIG_SPI_FLASH_4BYTE_MODE)
+#define CONFIG_SYS_MAX_FLASH_SECT	1024
+#else
+#define CONFIG_SYS_MAX_FLASH_SECT	256
+#endif
+
+#define PHYS_SPIFLASH_0			PHYS_FLASH_0
+#define PHYS_SPIFLASH_1			PHYS_FLASH_1
+#define CONFIG_SYS_MAX_SPI_FLASH_BANKS	2
+#define CONFIG_SYS_SPI_FLASH_BANKS_LIST	{ \
+		{PHYS_SPIFLASH_0, PHYS_FLASH_0_SIZE, 0, 0}, \
+		{PHYS_SPIFLASH_1, PHYS_FLASH_1_SIZE, 0, 1}, \
+	}
+#define TZ3000_SPI_DIR_MAP_BASE(n)	\
+	((n) == 0 ? PHYS_SPIFLASH_0 : PHYS_SPIFLASH_1)
+#define TZ3000_SPI_DIR_MAP_LEN(n)	\
+	((n) == 0 ? PHYS_FLASH_0_SIZE : PHYS_FLASH_1_SIZE)
+
+#define CONFIG_BOARD_EARLY_INIT_F
+#define CONFIG_ENV_IS_SELECTABLE
+#ifdef CONFIG_ENV_IS_SELECTABLE
+#define CONFIG_ENV_IS_IN_FLASH
+#ifdef CONFIG_TZ3000_SDHCI
+#define CONFIG_ENV_IS_IN_MMC
+#endif
+#ifdef CONFIG_TZ3000_SPI
+/* #define CONFIG_ENV_IS_IN_SPI_FLASH */
+#endif
+#define CONFIG_ENV_SIZE			0x20000
+#define CONFIG_ENV_SECT_SIZE		CONFIG_ENV_SIZE
+#ifdef CONFIG_ENV_IS_IN_FLASH
+#define CONFIG_ENV_OFFSET_IN_FLASH	CONFIG_SYS_MONITOR_LEN
+#define CONFIG_ENV_ADDR_IN_FLASH	\
+	(CONFIG_SYS_MONITOR_BASE + CONFIG_SYS_MONITOR_LEN)
+#endif
+#ifdef CONFIG_ENV_IS_IN_MMC
+#define CONFIG_ENV_OFFSET_IN_MMC	CONFIG_SYS_MONITOR_LEN
+#define CONFIG_SYS_MMC_ENV_DEV		tz2000_mmc_boot_dev
+#endif
+#ifdef CONFIG_ENV_IS_IN_SPI_FLASH
+#define CONFIG_ENV_OFFSET_IN_SPI_FLASH		CONFIG_SYS_MONITOR_LEN
+#define CONFIG_ENV_ADDR_IN_SPI_FLASH	\
+	(CONFIG_SYS_MONITOR_BASE + CONFIG_SYS_MONITOR_LEN)
+#endif
+#else /* !CONFIG_ENV_IS_SELECTABLE */
+#ifdef CONFIG_ENV_IS_NOWHERE
+#define CONFIG_ENV_SIZE			0x1000
+#elif defined(CONFIG_ENV_IS_IN_MMC)
+#define CONFIG_SYS_MMC_ENV_DEV		tz2000_mmc_boot_dev
+#define CONFIG_ENV_OFFSET		CONFIG_SYS_MONITOR_LEN
+#define CONFIG_ENV_SIZE			0x20000
+#elif defined(CONFIG_ENV_IS_IN_SPI_FLASH)
+#define CONFIG_ENV_OFFSET		CONFIG_SYS_MONITOR_LEN
+#define CONFIG_ENV_ADDR			\
+	(CONFIG_SYS_MONITOR_BASE + CONFIG_SYS_MONITOR_LEN)
+#define CONFIG_ENV_SIZE			0x20000
+#define CONFIG_ENV_SECT_SIZE		CONFIG_ENV_SIZE
+#else
+#define CONFIG_ENV_IS_IN_FLASH
+#define CONFIG_ENV_ADDR			\
+	(CONFIG_SYS_MONITOR_BASE + CONFIG_SYS_MONITOR_LEN)
+#define CONFIG_ENV_SIZE			0x20000
+#endif
+#endif /* !CONFIG_ENV_IS_SELECTABLE */
+#undef CONFIG_CMD_EXPORTENV
+#undef CONFIG_CMD_IMPORTENV
+
+/*-----------------------------------------------------------------------
+ * Memory configuration
+ */
+#define CONFIG_SYS_SDRAM_BASE		0x80000000
+#define CONFIG_SYS_SDRAM_SIZE		0x10000000
+#define CONFIG_NR_DRAM_BANKS		1
+#define CONFIG_SYS_MALLOC_LEN          (CONFIG_ENV_SIZE + 512 * 1024)
+
+#define CONFIG_SYS_GBL_DATA_SIZE	128
+
+#define	CONFIG_SYS_LOAD_ADDR		0x80200000
+#define CONFIG_SYS_MEMTEST_START	CONFIG_SYS_LOAD_ADDR
+#define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + 0x10000000)
+#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_TEXT_BASE - 0x100)
+
+/*-----------------------------------------------------------------------
+ * Chip & Board configuration
+ */
+#define TZ2000_PERIPH_CLK		12500000
+#define TZ2000_HBUS_CLK			50000000
+#define TZ3000_HBUS_CLK			TZ2000_HBUS_CLK
+#define TZ2000_EMAC_BUSCLK		100000000
+#define TZ3000_EMAC_BUSCLK		TZ2000_EMAC_BUSCLK
+
+#ifdef CONFIG_ENV_IS_IN_FLASH
+#define NS_TO_HBUS_CYCLE(ns)	NSEC_TO_SCSD(ns, TZ2000_HBUS_CLK)
+
+#define FDEN_SPIFLASH_0	FDEN_16MB
+#define FDEN_SPIFLASH_1	FDEN_16MB
+#define INIT_SPIC_MEMMAP_0	\
+	(FBA(PHYS_SPIFLASH_0) | FDEN(FDEN_SPIFLASH_0) | DIR_ENABLE)
+#define INIT_SPIC_DIRECT_0	\
+	(SPR(CONFIG_TZ3000_SPI_DEFAULT_SPR) | \
+	SCSD(NS_TO_HBUS_CYCLE(CONFIG_TZ3000_SPI_DEFAULT_CS_DEASSERT)) | \
+	SDCE(SDCE_NEGEDGE))
+
+#define INIT_SPIC_MEMMAP_1	\
+	(FBA(PHYS_SPIFLASH_1) | FDEN(FDEN_SPIFLASH_1) | DIR_ENABLE)
+#define INIT_SPIC_DIRECT_1	\
+	(SPR(CONFIG_TZ3000_SPI_DEFAULT_SPR) | \
+	SCSD(NS_TO_HBUS_CYCLE(CONFIG_TZ3000_SPI_DEFAULT_CS_DEASSERT)) | \
+	SDCE(SDCE_NEGEDGE))
+#endif /* CONFIG_ENV_IS_IN_FLASH */
+
+/*-----------------------------------------------------------------------
+ * External functions & symbols
+ */
+#ifndef __ASSEMBLY__
+extern void boottime(void);
+extern void perftime(void);
+extern int tz2000_periph_clk;
+extern int tz2000_board_id;
+extern int tz2000_debug_board;
+extern int tz2000_usb_hd;
+extern int tz2000_mmc_boot_dev;
+void v7_invalidate_dcache_all(void);
+#endif
+
+/*-----------------------------------------------------------------------
+ * U-Boot Application options
+ */
+#undef CONFIG_STANDALONE_ENABLE_CACHE
+#define CONFIG_STANDALONE_DISABLE_CACHE
+#define CONFIG_STANDALONE_LOAD_ADDR	CONFIG_SYS_LOAD_ADDR
+
+#endif /* __CONFIG_H */

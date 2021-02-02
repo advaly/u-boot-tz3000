@@ -29,6 +29,14 @@
 # define CONFIG_ENV_SPI_MODE	SPI_MODE_3
 #endif
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+#ifdef CONFIG_ENV_OFFSET_IN_SPI_FLASH
+#define CONFIG_ENV_OFFSET CONFIG_ENV_OFFSET_IN_SPI_FLASH
+#endif
+#ifdef CONFIG_ENV_OFFSET_REDUND_IN_SPI_FLASH
+#define CONFIG_ENV_OFFSET_REDUND CONFIG_ENV_OFFSET_REDUND_IN_SPI_FLASH
+#endif
+#endif /* CONFIG_ENV_IS_SELECTABLE */
 #ifdef CONFIG_ENV_OFFSET_REDUND
 static ulong env_offset		= CONFIG_ENV_OFFSET;
 static ulong env_new_offset	= CONFIG_ENV_OFFSET_REDUND;
@@ -39,12 +47,18 @@ static ulong env_new_offset	= CONFIG_ENV_OFFSET_REDUND;
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#ifndef CONFIG_ENV_IS_SELECTABLE
 char *env_name_spec = "SPI Flash";
+#endif
 
 static struct spi_flash *env_flash;
 
 #if defined(CONFIG_ENV_OFFSET_REDUND)
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int spi_flash_saveenv(void)
+#else
 int saveenv(void)
+#endif
 {
 	env_t	env_new;
 	ssize_t	len;
@@ -138,7 +152,11 @@ int saveenv(void)
 	return ret;
 }
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static void spi_flash_env_relocate_spec(void)
+#else
 void env_relocate_spec(void)
+#endif
 {
 	int ret;
 	int crc1_ok = 0, crc2_ok = 0;
@@ -222,7 +240,11 @@ out:
 	free(tmp_env2);
 }
 #else
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int spi_flash_saveenv(void)
+#else
 int saveenv(void)
+#endif
 {
 	u32	saved_size, saved_offset, sector = 1;
 	char	*res, *saved_buffer = NULL;
@@ -297,7 +319,11 @@ int saveenv(void)
 	return ret;
 }
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static void spi_flash_env_relocate_spec(void)
+#else
 void env_relocate_spec(void)
+#endif
 {
 	char buf[CONFIG_ENV_SIZE];
 	int ret;
@@ -325,7 +351,11 @@ out:
 }
 #endif
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int spi_flash_env_init(void)
+#else
 int env_init(void)
+#endif
 {
 	/* SPI flash isn't usable before relocation */
 	gd->env_addr = (ulong)&default_environment[0];
@@ -333,3 +363,14 @@ int env_init(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_ENV_IS_SELECTABLE
+struct env_ops spi_flash_env_ops = {
+	.env_name_spec = "SPI Flash",
+	.env_init = spi_flash_env_init,
+	.env_relocate_spec = spi_flash_env_relocate_spec,
+#ifdef CONFIG_CMD_SAVEENV
+	.saveenv = spi_flash_saveenv,
+#endif
+};
+#endif /* CONFIG_ENV_IS_SELECTABLE */

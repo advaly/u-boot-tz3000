@@ -33,6 +33,23 @@
 /* Header byte that marks the start of the message */
 #define SPI_PREAMBLE_END_BYTE	0xec
 
+#if defined(CONFIG_TZ3000_SPI)
+struct tz3000_spi_data {
+	unsigned int max_hz;
+	unsigned int deassert_time;
+	unsigned int max_map_read_hz;
+	unsigned char dir_read_opcode;
+	unsigned char dir_read_dummy_count;
+#ifdef CONFIG_SPI_FLASH_4BYTE_MODE
+	unsigned int use_4byte_mode:1;
+#endif
+};
+#define OPCODE_FAST_READ_SINGLE		0x0b
+#define OPCODE_FAST_READ_DUAL_OUTPUT	0x3b
+#define OPCODE_FAST_READ_DUAL_IO	0xbb
+#define OPCODE_FAST_READ_QUAD_OUTPUT	0x6b
+#define OPCODE_FAST_READ_QUAD_IO	0xeb
+#endif /* CONFIG_TZ3000_SPI */
 /**
  * struct spi_slave - Representation of a SPI slave
  *
@@ -49,6 +66,9 @@ struct spi_slave {
 	unsigned int cs;
 	unsigned int max_write_size;
 	void *memory_map;
+#if defined(CONFIG_TZ3000_SPI)
+	struct tz3000_spi_data *tz3000_spi_data;
+#endif
 };
 
 /**

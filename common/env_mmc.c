@@ -21,9 +21,19 @@
 #error CONFIG_ENV_SIZE_REDUND should be the same as CONFIG_ENV_SIZE
 #endif
 
+#ifndef CONFIG_ENV_IS_SELECTABLE
 char *env_name_spec = "MMC";
+#endif
 
-#ifdef ENV_IS_EMBEDDED
+#ifdef CONFIG_ENV_IS_SELECTABLE
+#ifdef CONFIG_ENV_OFFSET_IN_MMC
+#define CONFIG_ENV_OFFSET CONFIG_ENV_OFFSET_IN_MMC
+#endif
+#ifdef CONFIG_ENV_OFFSET_REDUND_IN_MMC
+#define CONFIG_ENV_OFFSET_REDUND CONFIG_ENV_OFFSET_REDUND_IN_MMC
+static env_t *env_ptr;
+#endif
+#elif defined(ENV_IS_EMBEDDED)
 env_t *env_ptr = &environment;
 #else /* ! ENV_IS_EMBEDDED */
 env_t *env_ptr;
@@ -53,7 +63,11 @@ __weak int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr)
 	return 0;
 }
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int mmc_env_init(void)
+#else
 int env_init(void)
+#endif
 {
 	/* use default */
 	gd->env_addr	= (ulong)&default_environment[0];
@@ -115,7 +129,11 @@ static inline int write_env(struct mmc *mmc, unsigned long size,
 static unsigned char env_flags;
 #endif
 
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static int mmc_saveenv(void)
+#else
 int saveenv(void)
+#endif
 {
 	ALLOC_CACHE_ALIGN_BUFFER(env_t, env_new, 1);
 	ssize_t	len;
@@ -185,7 +203,11 @@ static inline int read_env(struct mmc *mmc, unsigned long size,
 }
 
 #ifdef CONFIG_ENV_OFFSET_REDUND
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static void mmc_env_relocate_spec(void)
+#else
 void env_relocate_spec(void)
+#endif
 {
 #if !defined(ENV_IS_EMBEDDED)
 	struct mmc *mmc = find_mmc_device(CONFIG_SYS_MMC_ENV_DEV);
@@ -270,7 +292,11 @@ err:
 #endif
 }
 #else /* ! CONFIG_ENV_OFFSET_REDUND */
+#ifdef CONFIG_ENV_IS_SELECTABLE
+static void mmc_env_relocate_spec(void)
+#else
 void env_relocate_spec(void)
+#endif
 {
 #if !defined(ENV_IS_EMBEDDED)
 	ALLOC_CACHE_ALIGN_BUFFER(char, buf, CONFIG_ENV_SIZE);
@@ -304,3 +330,14 @@ err:
 #endif
 }
 #endif /* CONFIG_ENV_OFFSET_REDUND */
+
+#ifdef CONFIG_ENV_IS_SELECTABLE
+struct env_ops mmc_env_ops = {
+	.env_name_spec = "MMC",
+	.env_init = mmc_env_init,
+	.env_relocate_spec = mmc_env_relocate_spec,
+#ifdef CONFIG_CMD_SAVEENV
+	.saveenv = mmc_saveenv,
+#endif
+};
+#endif /* CONFIG_ENV_IS_SELECTABLE */

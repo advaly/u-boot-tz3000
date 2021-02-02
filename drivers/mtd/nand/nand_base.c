@@ -107,6 +107,28 @@ static struct nand_ecclayout nand_oob_128 = {
 		 .length = 78} }
 };
 
+static struct nand_ecclayout benand_oob_64 = {
+	.oobfree = {
+		{.offset = 0, .length = 16},
+		{.offset = 16, .length = 16},
+		{.offset = 32, .length = 16},
+		{.offset = 48, .length = 16},
+	}
+};
+
+static struct nand_ecclayout benand_oob_128 = {
+	.oobfree = {
+		{.offset = 2, .length = 3},
+		{.offset = 18, .length = 3},
+		{.offset = 34, .length = 3},
+		{.offset = 50, .length = 3},
+		{.offset = 66, .length = 3},
+		{.offset = 82, .length = 3},
+		{.offset = 98, .length = 3},
+		{.offset = 114, .length = 3},
+	}
+};
+
 static int nand_get_device(struct nand_chip *chip, struct mtd_info *mtd,
 			   int new_state);
 
@@ -839,6 +861,28 @@ static int nand_read_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 	chip->read_buf(mtd, buf, mtd->writesize);
 	if (oob_required)
 		chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
+	return 0;
+}
+
+static int nand_read_page_benand(struct mtd_info *mtd, struct nand_chip *chip,
+				 uint8_t *buf, int oob_required, int page)
+{
+	u8 status;
+
+	nand_read_page_raw(mtd, chip, buf, 1, page);
+
+	/* Check Read Status */
+
+	chip->cmdfunc(mtd, NAND_CMD_STATUS, -1, -1);
+	status = chip->read_byte(mtd);
+
+	if (status & NAND_STATUS_FAIL)
+		/* uncorrectable error */
+		mtd->ecc_stats.failed++;
+	else if (status & NAND_CHIP_READ_STATUS)
+		/* correctable error */
+		mtd->ecc_stats.corrected++;
+
 	return 0;
 }
 
@@ -1670,6 +1714,12 @@ static int nand_write_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 		chip->write_buf(mtd, chip->oob_poi, mtd->oobsize);
 
 	return 0;
+}
+
+static int nand_write_page_benand(struct mtd_info *mtd, struct nand_chip *chip,
+				  const uint8_t *buf, int oob_required)
+{
+	return nand_write_page_raw(mtd, chip, buf, 1);
 }
 
 /**
@@ -2721,6 +2771,7 @@ static void nand_decode_ext_id(struct mtd_info *mtd, struct nand_chip *chip,
 	chip->cellinfo = id_data[2];
 	/* The 4th id byte is the important one */
 	extid = id_data[3];
+	chip->ext_id = extid;
 
 	id_len = nand_id_len(id_data, 8);
 
@@ -2821,6 +2872,9 @@ static void nand_decode_ext_id(struct mtd_info *mtd, struct nand_chip *chip,
 		/* Get buswidth information */
 		*busw = (extid & 0x01) ? NAND_BUSWIDTH_16 : 0;
 	}
+	/* check BENAND (on-chip ECC) */
+	if (id_data[0] == NAND_MFR_TOSHIBA && (id_data[4] & 1 << 7))
+		chip->ecc.mode = NAND_ECC_BENAND;
 }
 
  /*
@@ -2918,6 +2972,8 @@ static const struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	/* Read manufacturer and device IDs */
 	*maf_id = chip->read_byte(mtd);
 	*dev_id = chip->read_byte(mtd);
+	chip->man_id = *maf_id;
+	chip->dev_id = *dev_id;
 
 	/*
 	 * Try again to make sure, as some systems the bus-hold or other
@@ -3132,6 +3188,20 @@ int nand_scan_tail(struct mtd_info *mtd)
 	/*
 	 * If no default placement scheme is given, select an appropriate one.
 	 */
+	if (!chip->ecc.layout && (chip->ecc.mode == NAND_ECC_BENAND)) {
+		switch (mtd->oobsize) {
+		case 64:
+			chip->ecc.layout = &benand_oob_64;
+			break;
+		case 128:
+			chip->ecc.layout = &benand_oob_128;
+			break;
+		default:
+			pr_warn("No oob scheme defined for benand oobsize %d\n",
+				mtd->oobsize);
+			BUG();
+		}
+	}
 	if (!chip->ecc.layout && (chip->ecc.mode != NAND_ECC_SOFT_BCH)) {
 		switch (mtd->oobsize) {
 		case 8:
@@ -3278,6 +3348,17 @@ int nand_scan_tail(struct mtd_info *mtd)
 			pr_warn("BCH ECC initialization failed!\n");
  		chip->ecc.strength =
 			chip->ecc.bytes * 8 / fls(8 * chip->ecc.size);
+		break;
+
+	case NAND_ECC_BENAND:
+		chip->ecc.read_page = nand_read_page_benand;
+		chip->ecc.write_page = nand_write_page_benand;
+		chip->ecc.read_page_raw = nand_read_page_raw;
+		chip->ecc.write_page_raw = nand_write_page_raw;
+		chip->ecc.read_oob = nand_read_oob_std;
+		chip->ecc.write_oob = nand_write_oob_std;
+		chip->ecc.size = 512;
+		chip->ecc.bytes = 9;
 		break;
 
 	case NAND_ECC_NONE:

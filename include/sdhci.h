@@ -243,9 +243,15 @@ struct sdhci_host {
 	struct mmc *mmc;
 	const struct sdhci_ops *ops;
 	int index;
+#ifdef CONFIG_MMC_ADMA
+#define SDHCI_ADMA_MAX_DESC 512	/* 64k block / 64kbyte */
+	u32 adma_desc[SDHCI_ADMA_MAX_DESC + 1][2]; /* + 1 end descriptor */
+#endif
 
 	void (*set_control_reg)(struct sdhci_host *host);
 	void (*set_clock)(int dev_index, unsigned int div);
+	void (*reset)(struct sdhci_host *host, u8 mask);
+	void (*enable_tuning)(struct sdhci_host *host, int enable);
 	uint	voltages;
 };
 

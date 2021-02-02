@@ -474,9 +474,18 @@ void main_loop(void)
 #ifdef CONFIG_BOOTDELAY
 	process_boot_delay();
 #endif
+#ifdef CONFIG_DISPLAY_BOOTTIME
+	if (getenv("boottime"))
+		boottime();
+#endif
 	/*
 	 * Main Loop for Monitor Command Processing
 	 */
+#ifdef CONFIG_NO_CMDLINE
+	for (;;)
+		;
+#endif
+
 #ifdef CONFIG_SYS_HUSH_PARSER
 	parse_file_outer();
 	/* This point is never reached */
@@ -496,8 +505,10 @@ void main_loop(void)
 		flag = 0;	/* assume no special flags for now */
 		if (len > 0)
 			strcpy (lastcommand, console_buffer);
+#ifndef CONFIG_DISABLE_REPEATE_COMMAND
 		else if (len == 0)
 			flag |= CMD_FLAG_REPEAT;
+#endif
 #ifdef CONFIG_BOOT_RETRY_TIME
 		else if (len == -2) {
 			/* -2 means timed out, retry autoboot
@@ -514,7 +525,11 @@ void main_loop(void)
 
 		if (len == -1)
 			puts ("<INTERRUPT>\n");
+#ifdef CONFIG_DISABLE_REPEATE_COMMAND
+		else if (len > 0)
+#else
 		else
+#endif
 			rc = run_command(lastcommand, flag);
 
 		if (rc <= 0) {

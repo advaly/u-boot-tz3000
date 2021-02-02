@@ -2303,13 +2303,31 @@ void flash_protect_default(void)
 
 	/* Environment protection ON by default */
 #ifdef CONFIG_ENV_IS_IN_FLASH
+#ifdef CONFIG_ENV_IS_SELECTABLE
+	if (env_ops == &flash_env_ops)
+		flash_protect(FLAG_PROTECT_SET,
+			      CONFIG_ENV_ADDR_IN_FLASH,
+			      CONFIG_ENV_ADDR_IN_FLASH +
+			      CONFIG_ENV_SECT_SIZE - 1,
+			      flash_get_info(CONFIG_ENV_ADDR_IN_FLASH));
+#else /* !CONFIG_ENV_IS_SELECTABLE */
 	flash_protect(FLAG_PROTECT_SET,
 		       CONFIG_ENV_ADDR,
 		       CONFIG_ENV_ADDR + CONFIG_ENV_SECT_SIZE - 1,
 		       flash_get_info(CONFIG_ENV_ADDR));
+#endif /* !CONFIG_ENV_IS_SELECTABLE */
 #endif
 
 	/* Redundant environment protection ON by default */
+#if defined(CONFIG_ENV_IS_SELECTABLE) && \
+	defined(CONFIG_ENV_ADDR_REDUND_IN_FLASH)
+	if (env_ops == &flash_env_ops)
+		flash_protect(FLAG_PROTECT_SET,
+			      CONFIG_ENV_ADDR_REDUND_IN_FLASH,
+			      CONFIG_ENV_ADDR_REDUND_IN_FLASH +
+			      CONFIG_ENV_SECT_SIZE - 1,
+			      flash_get_info(CONFIG_ENV_ADDR_REDUND_IN_FLASH));
+#endif /* CONFIG_ENV_IS_SELECTABLE */
 #ifdef CONFIG_ENV_ADDR_REDUND
 	flash_protect(FLAG_PROTECT_SET,
 		       CONFIG_ENV_ADDR_REDUND,

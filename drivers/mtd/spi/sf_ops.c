@@ -15,12 +15,20 @@
 
 #include "sf_internal.h"
 
-static void spi_flash_addr(u32 addr, u8 *cmd)
+static int spi_flash_addr(struct spi_flash *flash, u32 addr, u8 *cmd)
 {
 	/* cmd[0] is actual command */
+	if (spi_flash_use_4byte_mode(flash)) {
+		cmd[1] = addr >> 24;
+		cmd[2] = addr >> 16;
+		cmd[3] = addr >> 8;
+		cmd[4] = addr;
+		return 5;
+	}
 	cmd[1] = addr >> 16;
 	cmd[2] = addr >> 8;
 	cmd[3] = addr >> 0;
+	return 4;
 }
 
 int spi_flash_cmd_write_status(struct spi_flash *flash, u8 sr)
@@ -92,6 +100,29 @@ int spi_flash_cmd_wait_ready(struct spi_flash *flash, unsigned long timeout)
 		check_status = poll_bit;
 	}
 
+#ifdef CONFIG_TZ3000_SPI
+	/* TZ3000 SPI does not support polling without BEGIN/END */
+	timebase = get_timer(0);
+	do {
+		WATCHDOG_RESET();
+		ret = spi_flash_cmd(spi, cmd, &status, 1);
+		if (ret) {
+			debug("SF: fail to read %s status register\n",
+			      cmd == CMD_READ_STATUS ? "read" : "flag");
+			return ret;
+		}
+		if (cmd == CMD_FLAG_STATUS) {
+			u8 status2;
+			/* check twice (see n25q512a datasheet) */
+			ret = spi_flash_cmd(spi, cmd, &status2, 1);
+			if (ret)
+				return -1;
+			status &= status2;
+		}
+		if ((status & poll_bit) == check_status)
+			break;
+	} while (get_timer(timebase) < timeout);
+#else /* CONFIG_TZ3000_SPI */
 	ret = spi_xfer(spi, 8, &cmd, NULL, SPI_XFER_BEGIN);
 	if (ret) {
 		debug("SF: fail to read %s status register\n",
@@ -107,12 +138,21 @@ int spi_flash_cmd_wait_ready(struct spi_flash *flash, unsigned long timeout)
 		if (ret)
 			return -1;
 
+		if (cmd == CMD_FLAG_STATUS) {
+			u8 status2;
+			/* check twice (see n25q512a datasheet) */
+			ret = spi_xfer(spi, 8, NULL, &status2, 0);
+			if (ret)
+				return -1;
+			status &= status2;
+		}
 		if ((status & poll_bit) == check_status)
 			break;
 
 	} while (get_timer(timebase) < timeout);
 
 	spi_xfer(spi, 0, NULL, NULL, SPI_XFER_END);
+#endif /* CONFIG_TZ3000_SPI */
 
 	if ((status & poll_bit) == check_status)
 		return 0;
@@ -166,7 +206,8 @@ int spi_flash_write_common(struct spi_flash *flash, const u8 *cmd,
 int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 {
 	u32 erase_size;
-	u8 cmd[4];
+	u8 cmd[5];
+	int cmd_len;
 	int ret = -1;
 
 	erase_size = flash->erase_size;
@@ -182,12 +223,12 @@ int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 		if (ret < 0)
 			return ret;
 #endif
-		spi_flash_addr(offset, cmd);
+		cmd_len = spi_flash_addr(flash, offset, cmd);
 
 		debug("SF: erase %2x %2x %2x %2x (%x)\n", cmd[0], cmd[1],
 		      cmd[2], cmd[3], offset);
 
-		ret = spi_flash_write_common(flash, cmd, sizeof(cmd), NULL, 0);
+		ret = spi_flash_write_common(flash, cmd, cmd_len, NULL, 0);
 		if (ret < 0) {
 			debug("SF: erase failed\n");
 			break;
@@ -205,7 +246,8 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 {
 	unsigned long byte_addr, page_size;
 	size_t chunk_len, actual;
-	u8 cmd[4];
+	u8 cmd[5];
+	int cmd_len;
 	int ret = -1;
 
 	page_size = flash->page_size;
@@ -223,12 +265,12 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 		if (flash->spi->max_write_size)
 			chunk_len = min(chunk_len, flash->spi->max_write_size);
 
-		spi_flash_addr(offset, cmd);
+		cmd_len = spi_flash_addr(flash, offset, cmd);
 
 		debug("PP: 0x%p => cmd = { 0x%02x 0x%02x%02x%02x } chunk_len = %zu\n",
 		      buf + actual, cmd[0], cmd[1], cmd[2], cmd[3], chunk_len);
 
-		ret = spi_flash_write_common(flash, cmd, sizeof(cmd),
+		ret = spi_flash_write_common(flash, cmd, cmd_len,
 					buf + actual, chunk_len);
 		if (ret < 0) {
 			debug("SF: write failed\n");
@@ -267,20 +309,24 @@ int spi_flash_read_common(struct spi_flash *flash, const u8 *cmd,
 int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 		size_t len, void *data)
 {
-	u8 cmd[5], bank_sel = 0;
+	u8 cmd[6], bank_sel = 0;
+	int cmd_len;
 	u32 remain_len, read_len;
 	int ret = -1;
 
 	/* Handle memory-mapped SPI */
+#ifndef CONFIG_SPI_FLASH_BAR
 	if (flash->memory_map) {
 		spi_xfer(flash->spi, 0, NULL, NULL, SPI_XFER_MMAP);
 		memcpy(data, flash->memory_map + offset, len);
 		spi_xfer(flash->spi, 0, NULL, NULL, SPI_XFER_MMAP_END);
 		return 0;
 	}
+#endif /* !CONFIG_SPI_FLASH_BAR */
 
 	cmd[0] = CMD_READ_ARRAY_FAST;
 	cmd[4] = 0x00;
+	cmd[5] = 0x00;
 
 	while (len) {
 #ifdef CONFIG_SPI_FLASH_BAR
@@ -298,15 +344,28 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 		else
 			read_len = remain_len;
 
-		spi_flash_addr(offset, cmd);
+#ifdef CONFIG_SPI_FLASH_BAR
+		if (flash->memory_map) {
+			spi_xfer(flash->spi, 0, NULL, NULL, SPI_XFER_MMAP);
+			memcpy(data,
+			       flash->memory_map + offset % SPI_FLASH_16MB_BOUN,
+			       read_len);
+			spi_xfer(flash->spi, 0, NULL, NULL, SPI_XFER_MMAP_END);
+			goto next;
+		}
+#endif /* CONFIG_SPI_FLASH_BAR */
+		cmd_len = spi_flash_addr(flash, offset, cmd);
 
-		ret = spi_flash_read_common(flash, cmd, sizeof(cmd),
+		ret = spi_flash_read_common(flash, cmd, cmd_len + 1,
 							data, read_len);
 		if (ret < 0) {
 			debug("SF: read failed\n");
 			break;
 		}
 
+#ifdef CONFIG_SPI_FLASH_BAR
+next:
+#endif /* CONFIG_SPI_FLASH_BAR */
 		offset += read_len;
 		len -= read_len;
 		data += read_len;

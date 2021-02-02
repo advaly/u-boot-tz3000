@@ -384,7 +384,63 @@ usage:
 
 #endif
 
-static void nand_print_and_set_info(int idx)
+static const char *nand_manf_name(int man_id)
+{
+	static struct typetable {
+		const char *name;
+		int man_id;
+	} tbl[] = {
+		{"TOSHIBA",	0x98},
+		{"SAMSUNG",	0xec},
+		{"FUJITSU",	0x04},
+		{"NATIONAL",	0x8f},
+		{"RENESAS",	0x07},
+		{"STMICRO",	0x20},
+		{"HYNIX",	0xad},
+		{"MICRON",	0x2c},
+		{"AMD",		0x01},
+		{"",		0}
+	};
+
+	int i;
+	for (i = 0; strlen(tbl[i].name); i++) {
+		if (tbl[i].man_id == man_id)
+			break;
+	}
+	return tbl[i].name;
+}
+
+static void print_option_name(unsigned int options)
+{
+	static struct optiontable {
+		uint32_t option;
+		const char *name;
+	} tbl[] = {
+		{NAND_BUSWIDTH_16,
+		 "NAND_BUSWIDTH_16      : Buswitdh is 16 bit"},
+		{NAND_NO_PADDING,
+		 "NAND_NO_PADDING       : Supports partial programming"},
+		{NAND_CACHEPRG,
+		 "NAND_CACHEPRG         : Has cache program function"},
+		{NAND_COPYBACK,
+		 "NAND_COPYBACK         : Has copy back function"},
+		{NAND_IS_AND,
+		 "NAND_IS_AND           : AND Chip "},
+		{NAND_4PAGE_ARRAY,
+		 "NAND_4PAGE_ARRAY      : Has 4 pages array read function"},
+		{BBT_AUTO_REFRESH,
+		 "BBT_AUTO_REFRESH      : Requires periodic BBT rewrite"},
+		{NAND_NO_SUBPAGE_WRITE,
+		 "NAND_NO_SUBPAGE_WRITE : Chip does not allow subpage writes"}
+	};
+	int i;
+	for (i = 0; i < ARRAY_SIZE(tbl); i++) {
+		if (options & tbl[i].option)
+			printf("\t\t%s\n", tbl[i].name);
+	}
+}
+
+static void nand_print_and_set_info(int idx, int lvl)
 {
 	nand_info_t *nand = &nand_info[idx];
 	struct nand_chip *chip = nand->priv;
@@ -402,6 +458,35 @@ static void nand_print_and_set_info(int idx)
 	setenv_hex("nand_writesize", nand->writesize);
 	setenv_hex("nand_oobsize", nand->oobsize);
 	setenv_hex("nand_erasesize", nand->erasesize);
+	if (lvl > 0) {
+		printf("\toptions          = %08x\n", chip->options);
+		print_option_name(chip->options);
+		printf("\tpage_shift       = %d   (Page Size        = %d)\n",
+		       chip->page_shift, 1 << chip->page_shift);
+		printf("\tphys_erase_shift = %d   (Erase Block Size = %d)\n",
+		       chip->phys_erase_shift, 1 << chip->phys_erase_shift);
+		printf("\tbbt_erase_shift  = %d   (                 = %d)\n",
+		       chip->bbt_erase_shift, 1 << chip->bbt_erase_shift);
+		printf("\tchip_shift       = %d   (Chip Size        = %d)\n",
+		       chip->chip_shift, 1 << chip->chip_shift);
+		printf("\tnumchips         = %d\n", chip->numchips);
+		printf("\tchipsize         = %lld", chip->chipsize);
+		printf(" ( %d blocks / chip)\n",
+		       1 << (chip->chip_shift - chip->phys_erase_shift));
+		printf("\tpagemask         = %08x (%d pages/chip)\n",
+		       chip->pagemask, chip->pagemask+1);
+		printf("\tsubpagesize      = %d\n", chip->subpagesize);
+		printf("\tmanufacture ID   = %02x (%s)\n",
+		       chip->man_id, nand_manf_name(chip->man_id));
+		printf("\tDevice ID        = %02x\n", chip->dev_id);
+		printf("\tcellinfo         = %02x\n", chip->cellinfo);
+		printf("\tExtra Info       = %02x\n", chip->ext_id);
+		printf("\tbadblockpos      = %d\n", chip->badblockpos);
+		printf("\tSoftware Stuff\n");
+		printf("\t\tchip_delay       = %d\n", chip->chip_delay);
+		printf("\t\tpagebuf          = %d\n", chip->pagebuf);
+		printf("\t\tstate            = %d\n", chip->state);
+	}
 }
 
 static int raw_access(nand_info_t *nand, ulong addr, loff_t off, ulong count,
@@ -465,6 +550,7 @@ static void adjust_size_for_badblocks(loff_t *size, loff_t offset, int dev)
 static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	int i, ret = 0;
+	int lvl = 0;
 	ulong addr;
 	loff_t off, size, maxsize;
 	char *cmd, *s;
@@ -486,6 +572,8 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		quiet = simple_strtoul(quiet_str, NULL, 0) != 0;
 
 	cmd = argv[1];
+	if (argc > 2)
+		lvl = simple_strtoul(argv[2], NULL, 0);
 
 	/* Only "dump" is repeatable. */
 	if (repeat && strcmp(cmd, "dump"))
@@ -496,7 +584,7 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		putc('\n');
 		for (i = 0; i < CONFIG_SYS_MAX_NAND_DEVICE; i++) {
 			if (nand_info[i].name)
-				nand_print_and_set_info(i);
+				nand_print_and_set_info(i, lvl);
 		}
 		return 0;
 	}
@@ -507,7 +595,7 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			if (dev < 0 || dev >= CONFIG_SYS_MAX_NAND_DEVICE)
 				puts("no devices available\n");
 			else
-				nand_print_and_set_info(dev);
+				nand_print_and_set_info(dev, 0);
 			return 0;
 		}
 

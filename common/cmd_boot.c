@@ -34,6 +34,17 @@ static int do_go(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	printf ("## Starting application at 0x%08lX ...\n", addr);
 
+#ifdef CONFIG_STANDALONE_ENABLE_CACHE
+	flush_dcache_all();
+	invalidate_dcache_all();
+	invalidate_icache_all();
+#elif defined(CONFIG_STANDALONE_DISABLE_CACHE)
+	cleanup_before_linux();
+#endif
+#ifdef CONFIG_DISPLAY_BOOTTIME
+	if (getenv("boottime") && getenv("bootcmd"))
+		boottime();
+#endif
 	/*
 	 * pass address parameter as argv[0] (aka command name),
 	 * and all remaining args
@@ -41,6 +52,9 @@ static int do_go(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	rc = do_go_exec ((void *)addr, argc - 1, argv + 1);
 	if (rc != 0) rcode = 1;
 
+#ifdef CONFIG_STANDALONE_DISABLE_CACHE
+	setup_after_linux();
+#endif
 	printf ("## Application terminated, rc = 0x%lX\n", rc);
 	return rcode;
 }
