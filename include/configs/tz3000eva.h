@@ -198,7 +198,9 @@
 #define CONFIG_INITRD_TAG
 
 #define CONFIG_BOOTARGS	\
-	"root=/dev/nfs ip=192.168.1.2:::::eth0 nfsroot=192.168.1.1:/nfsroot console=ttyS0,115200"
+	"root=/dev/mmcblk0p2 rootwait console=ttyS0,115200 smsc95xx.turbo_mode=N"
+#define CONFIG_BOOTCOMMAND	\
+	"mmcinfo;fatload mmc 0:1 81000000 uImage;bootm 81000000"
 
 #define CONFIG_ETHADDR			00:11:22:33:44:55
 #define CONFIG_SERVERIP			192.168.1.1
